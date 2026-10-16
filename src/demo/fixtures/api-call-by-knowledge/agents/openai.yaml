@@ -1,0 +1,4 @@
+interface:
+  display_name: API 知识库规划器
+  short_description: 从 api-wiki 读取接口定义，生成 task_config.json 并规划 API 调用流程。
+  default_prompt: 根据我的自然语言需求，从 api-wiki 查询接口定义，规划调用顺序和参数，生成可交给执行器使用的 task_config.json。

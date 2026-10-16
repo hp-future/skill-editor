@@ -1,0 +1,7 @@
+node_modules/
+dist/
+dist-types/
+.tmp-sample/
+.screenshots/
+*.local
+.DS_Store
