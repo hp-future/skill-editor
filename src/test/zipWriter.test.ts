@@ -1,0 +1,233 @@
+import { execFile } from 'node:child_process';
+import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { promisify } from 'node:util';
+import { afterAll, describe, expect, it } from 'vitest';
+import { ZIP_METHOD, ZipWriteError, writeZipArchive } from '../lib/zip/zipWriter';
+import { parseZipArchive } from '../lib/zip/zipArchive';
+import { Crc32, crc32 } from '../lib/zip/crc32';
+import { createZip } from './zipCreator';
+
+const execFileAsync = promisify(execFile);
+const encoder = new TextEncoder();
+const decoder = new TextDecoder();
+
+const scratchDirs: string[] = [];
+
+async function scratch(): Promise<string> {
+  const dir = await mkdtemp(join(tmpdir(), 'skill-editor-zip-'));
+  scratchDirs.push(dir);
+  return dir;
+}
+
+afterAll(async () => {
+  await Promise.all(scratchDirs.map((dir) => rm(dir, { recursive: true, force: true })));
+});
+
+/** Round-trip through our own reader. */
+async function readBack(entries: Parameters<typeof writeZipArchive>[0]) {
+  const bytes = await writeZipArchive(entries);
+  const archive = parseZipArchive(bytes);
+  const contents = new Map<string, string>();
+  for (const entry of archive.entries) {
+    contents.set(entry.path, decoder.decode(await archive.readEntry(entry)));
+  }
+  return { bytes, archive, contents };
+}
+
+describe('crc32', () => {
+  it('matches the known CRC of a fixed buffer', () => {
+    // Reference value for "123456789" (IEEE 802.3).
+    expect(crc32(encoder.encode('123456789'))).toBe(0xcbf43926);
+  });
+
+  it('is incremental and resettable', () => {
+    const crc = new Crc32();
+    crc.update(encoder.encode('1234'));
+    crc.update(encoder.encode('56789'));
+    expect(crc.digest()).toBe(0xcbf43926);
+
+    // The digest is non-destructive, so the caller can keep feeding data.
+    expect(crc.digest()).toBe(0xcbf43926);
+    crc.update(encoder.encode(''));
+    expect(crc.digest()).toBe(0xcbf43926);
+
+    crc.reset();
+    crc.update(encoder.encode('123456789'));
+    expect(crc.digest()).toBe(0xcbf43926);
+  });
+
+  it('handles empty input', () => {
+    expect(crc32(new Uint8Array(0))).toBe(0);
+  });
+});
+
+describe('writeZipArchive', () => {
+  it('round-trips text entries through our own reader', async () => {
+    const markdown = '# 标题\n\n内容带中文与 emoji 🎯\n';
+    const { archive, contents } = await readBack([
+      { path: 'skill/SKILL.md', data: encoder.encode(markdown) },
+      { path: 'skill/references/api-index.md', data: encoder.encode('# index') },
+    ]);
+
+    expect(archive.entries.map((entry) => entry.path)).toEqual([
+      'skill/SKILL.md',
+      'skill/references/api-index.md',
+    ]);
+    expect(contents.get('skill/SKILL.md')).toBe(markdown);
+    expect(archive.entries[0].compression).toBe(ZIP_METHOD.Deflated);
+    expect(archive.entries[0].crc32).toBe(crc32(encoder.encode(markdown)));
+    expect(archive.entries[0].size).toBe(encoder.encode(markdown).length);
+  });
+
+  it('writes empty files and directory records', async () => {
+    const { archive, contents } = await readBack([
+      { path: 'skill/empty.md', data: new Uint8Array(0) },
+      { path: 'skill/notes/', directory: true },
+    ]);
+
+    expect(contents.get('skill/empty.md')).toBe('');
+    expect(archive.entries[0].size).toBe(0);
+    expect(archive.entries[1].isDirectory).toBe(true);
+  });
+
+  it('copies untouched entries from their raw deflated bytes', async () => {
+    // Build a source archive, then re-export one entry verbatim and one edited.
+    const sourceBytes = createZip([
+      { name: 'pkg/keep.md', content: 'keep me' },
+      { name: 'pkg/change.md', content: 'old body' },
+    ]);
+    const source = parseZipArchive(sourceBytes);
+    const [keep, change] = source.entries;
+
+    const exported = await writeZipArchive([
+      {
+        path: keep.path,
+        rawDeflated: await rawDeflatedOf(sourceBytes, keep.localHeaderOffset),
+        crc32: keep.crc32,
+        size: keep.size,
+        method: keep.compression,
+      },
+      { path: change.path, data: encoder.encode('new body') },
+    ]);
+
+    const reread = parseZipArchive(exported);
+    expect(decoder.decode(await reread.readEntry(reread.entries[0]))).toBe('keep me');
+    expect(decoder.decode(await reread.readEntry(reread.entries[1]))).toBe('new body');
+    expect(reread.entries[1].crc32).toBe(crc32(encoder.encode('new body')));
+  });
+
+  it('can store entries without compression', async () => {
+    const bytes = await writeZipArchive([{ path: 'a.txt', data: encoder.encode('plain') }], {
+      storeOnly: true,
+    });
+    const archive = parseZipArchive(bytes);
+    expect(archive.entries[0].compression).toBe(ZIP_METHOD.Stored);
+    expect(decoder.decode(await archive.readEntry(archive.entries[0]))).toBe('plain');
+  });
+
+  it('writes an archive comment', async () => {
+    const bytes = await writeZipArchive([{ path: 'a.txt', data: encoder.encode('x') }], {
+      comment: 'generated by skill-editor',
+    });
+    // The comment sits after the 22-byte EOCD record.
+    const eocdOffset = bytes.length - 22 - 'generated by skill-editor'.length;
+    expect(new DataView(bytes.buffer, bytes.byteOffset).getUint32(eocdOffset, true)).toBe(0x06054b50);
+    expect(decoder.decode(bytes.subarray(eocdOffset + 22))).toBe('generated by skill-editor');
+  });
+
+  it('rejects oversized archive comments', async () => {
+    await expect(
+      writeZipArchive([], { comment: 'x'.repeat(70_000) }),
+    ).rejects.toBeInstanceOf(ZipWriteError);
+  });
+
+  it('accepts an empty archive', async () => {
+    const bytes = await writeZipArchive([]);
+    const archive = parseZipArchive(bytes);
+    expect(archive.entries).toHaveLength(0);
+  });
+
+  it('is readable by the platform unzip (.NET Expand-Archive)', async () => {
+    const dir = await scratch();
+    const markdown = '# 知识库调用规划\n\n- 第一步\n- 第二步\n';
+    const bytes = await writeZipArchive([
+      { path: 'api-call-by-knowledge/SKILL.md', data: encoder.encode(markdown) },
+      { path: 'api-call-by-knowledge/agents/openai.yaml', data: encoder.encode('interface:\n  display_name: 演示\n') },
+      { path: 'api-call-by-knowledge/assets/empty.txt', data: new Uint8Array(0) },
+    ]);
+
+    const zipPath = join(dir, 'exported.zip');
+    await writeFile(zipPath, bytes);
+
+    const target = join(dir, 'out');
+    await execFileAsync('powershell.exe', [
+      '-NoProfile',
+      '-NonInteractive',
+      '-Command',
+      `Expand-Archive -LiteralPath '${zipPath}' -DestinationPath '${target}' -Force`,
+    ]);
+
+    const skill = await readFile(join(target, 'api-call-by-knowledge', 'SKILL.md'), 'utf8');
+    const yaml = await readFile(join(target, 'api-call-by-knowledge', 'agents', 'openai.yaml'), 'utf8');
+    expect(skill).toBe(markdown);
+    expect(yaml).toContain('display_name: 演示');
+
+    const topLevel = await readdir(target);
+    expect(topLevel).toEqual(['api-call-by-knowledge']);
+    const empty = await readFile(join(target, 'api-call-by-knowledge', 'assets', 'empty.txt'));
+    expect(empty.byteLength).toBe(0);
+  });
+
+  it('re-exports a real archive that .NET can still expand', async () => {
+    const dir = await scratch();
+    const sourceBytes = createZip([
+      { name: 'pkg/keep.md', content: 'unchanged body\n' },
+      { name: 'pkg/edit.md', content: 'before\n' },
+    ]);
+    const source = parseZipArchive(sourceBytes);
+
+    const entries = [];
+    for (const entry of source.entries) {
+      const edited = entry.path === 'pkg/edit.md';
+      entries.push(
+        edited
+          ? { path: entry.path, data: encoder.encode('after\n') }
+          : {
+              path: entry.path,
+              rawDeflated: await rawDeflatedOf(sourceBytes, entry.localHeaderOffset),
+              crc32: entry.crc32,
+              size: entry.size,
+              method: entry.compression,
+            },
+      );
+    }
+
+    const exported = await writeZipArchive(entries);
+    const zipPath = join(dir, 're-exported.zip');
+    await writeFile(zipPath, exported);
+    const target = join(dir, 'out');
+    await execFileAsync('powershell.exe', [
+      '-NoProfile',
+      '-NonInteractive',
+      '-Command',
+      `Expand-Archive -LiteralPath '${zipPath}' -DestinationPath '${target}' -Force`,
+    ]);
+
+    expect(await readFile(join(target, 'pkg', 'keep.md'), 'utf8')).toBe('unchanged body\n');
+    expect(await readFile(join(target, 'pkg', 'edit.md'), 'utf8')).toBe('after\n');
+  });
+});
+
+/** Slice the compressed payload of an entry out of the source bytes. */
+async function rawDeflatedOf(source: Uint8Array, localHeaderOffset: number): Promise<Uint8Array> {
+  const view = new DataView(source.buffer, source.byteOffset, source.byteLength);
+  const nameLength = view.getUint16(localHeaderOffset + 26, true);
+  const extraLength = view.getUint16(localHeaderOffset + 28, true);
+  const start = localHeaderOffset + 30 + nameLength + extraLength;
+  const archive = parseZipArchive(source);
+  const entry = archive.entries.find((item) => item.localHeaderOffset === localHeaderOffset);
+  if (!entry) throw new Error('entry not found');
+  return source.subarray(start, start + entry.compressedSize).slice();
+}

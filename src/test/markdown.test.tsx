@@ -8,6 +8,17 @@ function html(source: string, options?: { showFrontmatter?: boolean }): string {
   return renderToStaticMarkup(<>{nodes}</>);
 }
 
+/** Text content of rendered markup, with HTML entities decoded again. */
+function textOf(markup: string): string {
+  return markup
+    .replace(/<[^>]+>/g, '')
+    .replace(/&quot;/g, '"')
+    .replace(/&#x27;/g, "'")
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&');
+}
+
 describe('parseFrontmatter', () => {
   it('splits a leading block from the body', () => {
     const parsed = parseFrontmatter('---\nname: demo\ntags: "a, b"\n---\n# Title\n');
@@ -40,6 +51,20 @@ describe('renderMarkdown', () => {
     expect(markup).toContain('<h3 id="核心约束"');
   });
 
+  it('keeps heading anchors unique for repeated and slug-less headings', () => {
+    const result = renderMarkdown('# 核心约束\n\n## 核心约束\n\n### ？？？\n\n#### ？？？\n');
+
+    expect(result.headings.map((heading) => heading.id)).toEqual([
+      '核心约束',
+      '核心约束-2',
+      'section',
+      'section-2',
+    ]);
+    const markup = renderToStaticMarkup(<>{result.nodes}</>);
+    expect(markup.match(/id="核心约束"/g)).toHaveLength(1);
+    expect(markup.match(/id="核心约束-2"/g)).toHaveLength(1);
+  });
+
   it('renders inline emphasis, code and links', () => {
     const markup = html('**加粗** 与 *斜体* 以及 `code` 和 [链接](references/api-index.md)。');
     expect(markup).toContain('<strong>加粗</strong>');
@@ -61,16 +86,19 @@ describe('renderMarkdown', () => {
     expect(markup).toContain('点我');
   });
 
-  it('renders fenced code blocks with their language', () => {
+  it('renders fenced code blocks with their language and highlights tokens', () => {
     const markup = html('```json\n{"a": 1}\n```\n');
     expect(markup).toContain('data-language="json"');
-    expect(markup).toContain('{&quot;a&quot;: 1}');
+    // Highlighting wraps tokens; the text content still round-trips.
+    expect(textOf(markup)).toContain('{"a": 1}');
+    expect(markup).toContain('se-code__property');
+    expect(markup).toContain('se-code__number');
   });
 
   it('keeps Markdown inside code fences literal', () => {
     const markup = html('```text\n**not bold**\n```\n');
     expect(markup).not.toContain('<strong>');
-    expect(markup).toContain('**not bold**');
+    expect(textOf(markup)).toContain('**not bold**');
   });
 
   it('renders unordered and ordered lists', () => {

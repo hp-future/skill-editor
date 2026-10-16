@@ -8,6 +8,7 @@
  */
 import { createElement, Fragment, type ReactNode } from 'react';
 import { parseFrontmatter } from './frontmatter';
+import { highlight } from './highlight';
 
 export interface MarkdownHeading {
   readonly id: string;
@@ -19,11 +20,33 @@ export interface RenderedMarkdown {
   readonly nodes: readonly ReactNode[];
   readonly frontmatter: Readonly<Record<string, string>>;
   readonly headings: readonly MarkdownHeading[];
+  /**
+   * Every link in the document, in document order. Hosts use this to wire up
+   * in-package navigation without re-parsing the source.
+   */
+  readonly links: readonly MarkdownLink[];
+}
+
+/** A link found while rendering, with its raw and sanitised targets. */
+export interface MarkdownLink {
+  /** The href as written in the source. */
+  readonly target: string;
+  /** The href actually rendered (already sanitised, or `null` when dropped). */
+  readonly href: string | null;
+  /** Link text, flattened. */
+  readonly text: string;
+  /** `true` for `http(s):` and `mailto:` links, which leave the package. */
+  readonly external: boolean;
 }
 
 export interface MarkdownOptions {
   /** Render the leading frontmatter block as a definition list. Default `true`. */
   showFrontmatter?: boolean;
+  /**
+   * Heading id to mark as the current target, e.g. right after a table-of-
+   * contents jump. The heading gets `is-active` so CSS can flash it.
+   */
+  activeHeadingId?: string | null;
 }
 
 /* ------------------------------- inline -------------------------------- */
@@ -34,7 +57,7 @@ type InlineToken =
   | { type: 'strong'; value: string }
   | { type: 'em'; value: string }
   | { type: 'del'; value: string }
-  | { type: 'link'; href: string; value: string };
+  | { type: 'link'; href: string; target: string; value: string };
 
 const INLINE_PATTERN =
   /(`[^`\n]+`)|(\*\*[^*\n]+\*\*|__[^_\n]+__)|(\*[^*\n]+\*|(?<![\w*])_[^_\n]+_(?![\w*]))|(~~[^~\n]+~~)|(\[[^\]\n]*\]\([^()\s]*(?:\([^()]*\)[^()\s]*)*\))/;
@@ -67,8 +90,9 @@ function tokenizeInline(text: string): InlineToken[] {
     } else if (raw.startsWith('[')) {
       const closing = raw.lastIndexOf('](');
       const label = raw.slice(1, closing);
-      const href = safeHref(raw.slice(closing + 2, -1));
-      if (href) tokens.push({ type: 'link', href, value: label });
+      const target = raw.slice(closing + 2, -1);
+      const href = safeHref(target);
+      if (href) tokens.push({ type: 'link', href, target, value: label });
       else tokens.push({ type: 'text', value: label });
     } else {
       tokens.push({ type: 'em', value: raw.slice(1, -1) });
@@ -81,10 +105,27 @@ function tokenizeInline(text: string): InlineToken[] {
   return tokens;
 }
 
+/** `http(s):` / `mailto:` links leave the package and open in a new tab. */
+export function isExternalHref(href: string): boolean {
+  return /^(https?:|mailto:)/i.test(href.trim());
+}
+
+/** Flatten link text so it can be reported alongside the link. */
+function flattenInline(text: string): string {
+  return tokenizeInline(text)
+    .map((token) => token.value)
+    .join('');
+}
+
 let keySeed = 0;
 const nextKey = (): string => `md-${(keySeed += 1)}`;
 
-function renderInline(text: string, keyPrefix: string): ReactNode[] {
+interface InlineContext {
+  /** Collects links so hosts can resolve in-package navigation. */
+  readonly links?: MarkdownLink[];
+}
+
+function renderInline(text: string, keyPrefix: string, context: InlineContext = {}): ReactNode[] {
   return tokenizeInline(text).map((token, index) => {
     const key = `${keyPrefix}-${index}`;
     switch (token.type) {
@@ -97,17 +138,34 @@ function renderInline(text: string, keyPrefix: string): ReactNode[] {
           </code>
         );
       case 'strong':
-        return <strong key={key}>{renderInline(token.value, `${key}s`)}</strong>;
+        return <strong key={key}>{renderInline(token.value, `${key}s`, context)}</strong>;
       case 'em':
-        return <em key={key}>{renderInline(token.value, `${key}e`)}</em>;
+        return <em key={key}>{renderInline(token.value, `${key}e`, context)}</em>;
       case 'del':
-        return <del key={key}>{renderInline(token.value, `${key}d`)}</del>;
-      case 'link':
+        return <del key={key}>{renderInline(token.value, `${key}d`, context)}</del>;
+      case 'link': {
+        const external = isExternalHref(token.href);
+        context.links?.push({
+          target: token.target,
+          href: token.href,
+          text: flattenInline(token.value),
+          external,
+        });
         return (
-          <a key={key} className="se-md__link" href={token.href} target="_blank" rel="noreferrer noopener">
-            {renderInline(token.value, `${key}l`)}
+          <a
+            key={key}
+            className="se-md__link"
+            href={token.href}
+            data-md-link={token.target}
+            title={token.target}
+            // In-package links are handled by the preview, so they must not
+            // open a tab or trigger a document navigation.
+            {...(external ? { target: '_blank', rel: 'noreferrer noopener' } : {})}
+          >
+            {renderInline(token.value, `${key}l`, context)}
           </a>
         );
+      }
       default:
         return null;
     }
@@ -284,23 +342,57 @@ function parseBlocks(body: string): Block[] {
   return blocks;
 }
 
-function slugify(text: string, fallback: string): string {
-  const slug = text
+function slugify(text: string): string {
+  return text
     .toLowerCase()
     .replace(/[^\w\u4e00-\u9fa5-]+/g, '-')
     .replace(/^-+|-+$/g, '');
-  return slug || fallback;
+}
+
+/**
+ * Assigns document-unique anchor ids.
+ *
+ * Headings without a slug (e.g. pure punctuation) and repeated headings both
+ * need a suffix, otherwise `# 核心约束` appearing twice would produce two
+ * elements with the same id and the table of contents could only ever reach the
+ * first one.
+ */
+function createAnchorRegistry(): (text: string) => string {
+  const used = new Map<string, number>();
+  return (text: string) => {
+    const base = slugify(text) || 'section';
+    const seen = used.get(base) ?? 0;
+    used.set(base, seen + 1);
+    return seen === 0 ? base : `${base}-${seen + 1}`;
+  };
+}
+
+/** Render highlighted code-block content, keeping unknown languages plain. */
+function renderCode(code: string, language: string | null, keyPrefix: string): ReactNode {
+  const { tokens } = highlight(code, language);
+  return tokens.map((token, index) =>
+    token.type === 'plain' ? (
+      <Fragment key={`${keyPrefix}-${index}`}>{token.value}</Fragment>
+    ) : (
+      <span key={`${keyPrefix}-${index}`} className={`se-code__${token.type}`}>
+        {token.value}
+      </span>
+    ),
+  );
 }
 
 /* -------------------------------- render ------------------------------- */
 
 /** Render Markdown to React nodes (no `dangerouslySetInnerHTML` anywhere). */
 export function renderMarkdown(source: string, options: MarkdownOptions = {}): RenderedMarkdown {
-  const { showFrontmatter = true } = options;
+  const { showFrontmatter = true, activeHeadingId = null } = options;
   const { frontmatter, body } = parseFrontmatter(source);
   const blocks = parseBlocks(body);
   const nodes: ReactNode[] = [];
   const headings: MarkdownHeading[] = [];
+  const links: MarkdownLink[] = [];
+  const inlineContext: InlineContext = { links };
+  const anchorFor = createAnchorRegistry();
   const entries = Object.entries(frontmatter);
 
   if (showFrontmatter && entries.length > 0) {
@@ -309,7 +401,7 @@ export function renderMarkdown(source: string, options: MarkdownOptions = {}): R
         {entries.map(([key, value]) => (
           <Fragment key={`${key}`}>
             <dt>{key}</dt>
-            <dd>{renderInline(value, `fm-${key}`)}</dd>
+            <dd>{renderInline(value, `fm-${key}`, inlineContext)}</dd>
           </Fragment>
         ))}
       </dl>,
@@ -320,13 +412,19 @@ export function renderMarkdown(source: string, options: MarkdownOptions = {}): R
     const key = `block-${index}`;
     switch (block.type) {
       case 'heading': {
-        const id = slugify(block.text, `section-${index}`);
+        const id = anchorFor(block.text);
         headings.push({ id, text: block.text, level: block.level });
         nodes.push(
           createElement(
             `h${Math.min(block.level + 1, 6)}`,
-            { key, id, className: `se-md__heading se-md__h${block.level}` },
-            renderInline(block.text, key),
+            {
+              key,
+              id,
+              className: `se-md__heading se-md__h${block.level}${
+                id === activeHeadingId ? ' is-active' : ''
+              }`,
+            },
+            renderInline(block.text, key, inlineContext),
           ),
         );
         break;
@@ -334,14 +432,14 @@ export function renderMarkdown(source: string, options: MarkdownOptions = {}): R
       case 'paragraph':
         nodes.push(
           <p key={key} className="se-md__p">
-            {renderInline(block.lines.join(' '), key)}
+            {renderInline(block.lines.join(' '), key, inlineContext)}
           </p>,
         );
         break;
       case 'code':
         nodes.push(
           <pre key={key} className="se-md__pre" data-language={block.language ?? undefined}>
-            <code>{block.lines.join('\n')}</code>
+            <code>{renderCode(block.lines.join('\n'), block.language, key)}</code>
           </pre>,
         );
         break;
@@ -351,13 +449,15 @@ export function renderMarkdown(source: string, options: MarkdownOptions = {}): R
       case 'quote':
         nodes.push(
           <blockquote key={key} className="se-md__quote">
-            {renderInline(block.lines.join(' '), key)}
+            {renderInline(block.lines.join(' '), key, inlineContext)}
           </blockquote>,
         );
         break;
       case 'list': {
         const items = block.items.map((item, itemIndex) => (
-          <li key={`${key}-${itemIndex}`}>{renderInline(item.join(' '), `${key}-${itemIndex}`)}</li>
+          <li key={`${key}-${itemIndex}`}>
+            {renderInline(item.join(' '), `${key}-${itemIndex}`, inlineContext)}
+          </li>
         ));
         nodes.push(
           block.ordered ? (
@@ -380,7 +480,7 @@ export function renderMarkdown(source: string, options: MarkdownOptions = {}): R
                 <tr>
                   {block.head.map((cell, cellIndex) => (
                     <th key={`${key}-h-${cellIndex}`} style={{ textAlign: block.align[cellIndex] ?? undefined }}>
-                      {renderInline(cell, `${key}-h-${cellIndex}`)}
+                      {renderInline(cell, `${key}-h-${cellIndex}`, inlineContext)}
                     </th>
                   ))}
                 </tr>
@@ -393,7 +493,7 @@ export function renderMarkdown(source: string, options: MarkdownOptions = {}): R
                         key={`${key}-r-${rowIndex}-${cellIndex}`}
                         style={{ textAlign: block.align[cellIndex] ?? undefined }}
                       >
-                        {renderInline(cell, `${key}-r-${rowIndex}-${cellIndex}`)}
+                        {renderInline(cell, `${key}-r-${rowIndex}-${cellIndex}`, inlineContext)}
                       </td>
                     ))}
                   </tr>
@@ -408,5 +508,5 @@ export function renderMarkdown(source: string, options: MarkdownOptions = {}): R
     }
   });
 
-  return { nodes, frontmatter, headings };
+  return { nodes, frontmatter, headings, links };
 }

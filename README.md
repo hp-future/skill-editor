@@ -23,7 +23,64 @@
 
 6. 目录区域不再提供「选择文件」入口（连带隐藏的 `<input type="file">` 一并移除），文件只能从外部传入；空状态只保留一句提示。
 
+**第六阶段（已完成）**
+
+7. 文件编辑：修改已有文本文件内容 → 显式保存 → 导出包含改动的新 `.zip`（Blob 交给宿主下载）。
+
+**第七阶段（已完成）**
+
+8. Markdown 渲染器增强：代码块语法高亮，以及锚点目录（大纲跳转）。
+
+**第八阶段（已完成）**
+
+9. Markdown 内部相对链接直接跳转：点击 `references/api-index.md`、`./x.md`、`../SKILL.md` 即切换到对应文件，`#锚点` 在窗格内滚动。
+
 ![SkillEditor 目录树](docs/phase1.png)
+
+## 文件编辑与导出
+
+| 能力 | 说明 |
+| --- | --- |
+| 可编辑范围 | **只改已有文本文件**（`markdown` / `text`）；图片、二进制不出现「编辑」入口，不支持新增 / 删除 / 重命名 |
+| 进入编辑 | 预览头部的「编辑」按钮（需宿主开启 `editable`） |
+| 保存模型 | **显式保存**：`Ctrl/⌘ + S` 或「保存」按钮；`Esc` 放弃草稿并退回预览 |
+| 脏标记 | 树节点右侧出现圆点、预览头部出现「已修改」、宿主可通过 `onEditChange` 显示数量 |
+| 切换保护 | 草稿未保存时切换文件会弹出确认：保存并切换 / 放弃修改并切换 / 取消 |
+| 撤销修改 | 预览头部「撤销对该文件的修改」把该文件还原为压缩包原始内容 |
+| 导出 | 宿主调 `ref.exportArchive()`，拿到 `{ blob, fileName, stats, warnings }` 后自行下载；导出前会弹出元数据损失确认 |
+
+```tsx
+const ref = useRef<SkillEditorHandle>(null);
+
+<SkillEditor
+  ref={ref}
+  editable
+  source={file}
+  onEditChange={(summary) => setExportEnabled(summary.dirty)}
+/>
+
+// 宿主工具栏里：
+<button
+  disabled={!dirty}
+  onClick={async () => {
+    const exported = await ref.current?.exportArchive();   // 取消时返回 null
+    if (exported) saveBlob(exported.blob, exported.fileName); // api-call-by-knowledge-edited.zip
+  }}
+>
+  导出 .zip
+</button>
+```
+
+![编辑视图](docs/phase6-editor.png)
+
+![导出前确认](docs/phase6-dialog.png)
+
+### 已知限制
+
+- **重打包会丢失源压缩包的 extra field、压缩包注释、外部文件属性**；未修改文件的内容、路径与压缩数据（原始 DEFLATE 字节 + CRC）逐字节保留。导出对话框与 `warnings` 都会明确提示。
+- 不支持新增 / 删除 / 重命名文件，也不支持编辑二进制内容。
+- 没有版本合并：外部重新传入 `source` 会重置所有改动。
+- 单个条目的未压缩数据超过 4 GiB 会被拒绝（未实现 per-entry ZIP64），错误信息会直接说明。
 
 ## 目录树操作
 
@@ -54,6 +111,36 @@
 ![预览表格](docs/phase2-table.png)
 
 ![源码模式](docs/phase2-source.png)
+
+### 代码高亮与目录（第七阶段）
+
+- **代码高亮**：代码块按围栏语言着色（json / ts / js / py / sh / yaml / toml / ini / css / html / xml / md / sql / ps1 / java / go / diff 等），无依赖的词法扫描器，未识别的语言按纯文本渲染。支持深色模式配色。
+- **锚点目录**：预览头部出现「目录」按钮（仅 Markdown 渲染视图且存在标题时），点开是标题大纲，点击即滚动到对应章节并短暂高亮。
+
+![代码高亮](docs/phase7-code.png)
+
+![目录跳转](docs/phase7-toc.png)
+
+### 包内链接跳转（第八阶段）
+
+预览里的 Markdown 链接按目标分类处理：
+
+| 链接写法 | 行为 |
+| --- | --- |
+| `references/api-index.md` | 在右侧窗格打开该文件（大小写不敏感，支持唯一后缀匹配） |
+| `./agents/openai.yaml`、`../SKILL.md` | 按当前文件所在目录解析；`..` 不会跳出压缩包根目录 |
+| `references/api-index.md#检索命令` | 打开目标文件后再滚动到该锚点并高亮 |
+| `#本文锚点` | 只在当前文档内滚动，不切换文件 |
+| `https://…`、`mailto:…` | 保持原生行为，在新标签页打开 |
+| 指向不存在的文件、`/` 绝对路径、目录链接 | 阻止跳转，并在预览顶部提示「压缩包内没有「…」」等说明 |
+
+跳转由预览的点击委托统一处理：`preventDefault` 后交给宿主查询目标文件，因此不会让浏览器离开编辑器，也不会把锚点写进地址栏。宿主可通过 `onNavigate` 覆盖「链接 → 文件」的查找策略。
+
+![包内链接](docs/phase8-links.png)
+
+![锚点跳转](docs/phase8-anchor.png)
+
+![失效链接提示](docs/phase8-broken.png)
 
 ## 快速开始
 
@@ -154,10 +241,14 @@ const state = useFilePreview({ archive, tree, selectedPath });
 ```tsx
 const ref = useRef<SkillEditorHandle>(null);
 
-ref.current?.reload();          // 重新解析当前文件
-ref.current?.expandAll();       // 展开全部目录
-ref.current?.collapseAll();     // 收起全部目录
-ref.current?.getResult();       // 取得解析结果（含原始 ZipArchive 与 readFile）
+ref.current?.reload();                    // 重新解析当前文件
+ref.current?.expandAll();                 // 展开全部目录
+ref.current?.collapseAll();               // 收起全部目录
+ref.current?.getResult();                 // 解析结果（含只读 ZipArchive）
+ref.current?.getDocument();               // 可编辑视图（SkillDocument）
+ref.current?.hasUnsavedChanges();         // 是否有已保存但未导出的改动
+ref.current?.discardEdits();              // 丢弃全部改动（不弹确认）
+ref.current?.exportArchive();             // 重打包，返回 { blob, fileName, stats, warnings } 或 null
 ```
 
 ## 组件属性
@@ -165,12 +256,14 @@ ref.current?.getResult();       // 取得解析结果（含原始 ZipArchive 与
 | 属性 | 类型 | 默认值 | 说明 |
 | --- | --- | --- | --- |
 | `source` | `Blob \| ArrayBuffer \| null` | — | 要展示的 `.zip`，由宿主传入；`null` / 不传即空状态。组件自身不选取文件 |
+| `editable` | `boolean` | `false` | 开启后文本类文件出现「编辑」入口；关闭时组件完全只读 |
 | `children` | `ReactNode` | — | 替换整个右侧面板 |
 | `previewMode` | `'preview' \| 'placeholder'` | `'preview'` | 右侧是否渲染内置预览 |
 | `renderFilePreview` | `(state, props) => ReactNode` | — | 替换预览主体，保留文件头 |
 | `onLoad` | `(result: SkillArchiveResult) => void` | — | 解析成功后回调 |
 | `onError` | `(error: Error) => void` | — | 解析失败或文件不合法时回调 |
 | `onSelectChange` | `(node: SkillTreeNode \| null) => void` | — | 选中节点变化时回调 |
+| `onEditChange` | `(summary: EditSummary) => void` | — | 已保存改动 / 草稿状态变化，用于控制宿主的导出按钮 |
 | `maxSizeBytes` | `number` | `100 MB` | 文件体积上限 |
 | `defaultExpandedDepth` | `number` | `1` | 初始展开层级 |
 | `hideExpandToggle` | `boolean` | `false` | 隐藏目录面板的「全部展开 / 收起」按钮 |
@@ -182,16 +275,24 @@ ref.current?.getResult();       // 取得解析结果（含原始 ZipArchive 与
 ```
 src/
   components/SkillEditor/
-    SkillEditor.tsx       # 左右布局、文件接收、状态管理
+    SkillEditor.tsx       # 左右布局、文件接收、编辑 / 导出编排
     FileTree.tsx          # 通用目录树（ARIA + 键盘导航）
     FilePreview.tsx       # 右侧预览：文件头 + 内容主体
     useFilePreview.ts     # 选中文件的按需读取 / 解码 / 状态机
+    FileEditor.tsx        # 编辑视图：草稿 + 显式保存
+    useFileEditor.ts      # 草稿状态、脏标记、撤销
+    useConfirm.tsx        # Promise 式确认弹层（原生 <dialog>）
     SkillEditor.css       # 全部样式（.se-root 作用域内）
     FilePreview.css       # 预览相关样式
+    FileEditor.css        # 编辑视图样式
+    ConfirmDialog.css     # 弹层样式
     icons.tsx             # 内联 SVG 图标
     index.ts
   lib/
     zip/zipArchive.ts     # 零依赖 ZIP 解析（central directory + 按需解压）
+    zip/zipWriter.ts      # 流式 ZIP 写入（data descriptor / 原样搬运 / ZIP64 EOCD）
+    zip/crc32.ts          # CRC-32（读取校验、写入与测试共用）
+    document/skillDocument.ts  # 编辑覆盖层 + 重打包导出
     skillTree.ts          # 目录树构建、展开状态、扁平化
     skillManifest.ts      # SKILL.md frontmatter / 标题 / 描述提取
     frontmatter.ts        # frontmatter 解析（预览与摘要共用）
@@ -199,27 +300,30 @@ src/
     fileKind.ts           # 类型判定（按扩展名 + 内容嗅探）
     loadSkillArchive.ts   # 串联解析流程，识别 wrapper 目录
     format.ts
-  demo/                   # 演示页（宿主工具栏 DemoApp + main.tsx + 示例技能包）
+  demo/                   # 演示页（宿主工具栏 + 导出 DemoApp、main.tsx、示例技能包）
   test/                   # Vitest 用例与 ZIP 构造器
 scripts/
   inspect-zip.mts         # 命令行检查任意 .zip 的解析结果
   make-image-zip.mts      # 生成带图片的临时压缩包（预览自测用）
   drive-page.mjs          # 用无头 Chrome 驱动演示页做交互验证
+  verify-export.mjs       # 把浏览器导出的 base64 解回 zip，用 .NET 解压校验
 ```
 
 ## 关键实现说明
 
 - **ZIP 解析零依赖**：`src/lib/zip/zipArchive.ts` 只读取中央目录，文件名与结构立即可用；文件内容在真正需要时才通过 `DecompressionStream('deflate-raw')` 解压。支持 stored / deflate、data descriptor、ZIP64 定位记录、UTF-8 与 CP437 文件名。
+- **导出只重压改动的文件**：`zipWriter.ts` 对未修改条目直接搬运原始 DEFLATE 字节与原 CRC（`rawDeflated`），只有改动文件重新压缩，并按源包风格写 data descriptor（本地头 crc/大小为 0，真值在数据之后）。写入器已用 .NET `Expand-Archive` 交叉验证。
+- **编辑是覆盖层**：`SkillDocument` 持有源压缩包 + 一张「已保存改动」表，源字节永不修改；`pathToArchive` 做带缓存的确定性路径解析（精确路径 or 唯一后缀），因此折叠 wrapper 后依然能定位文件。
 - **wrapper 目录折叠**：压缩包若只有一个顶层目录（如 `api-call-by-knowledge/…`），该目录会作为根节点展示，避免出现无意义的单层嵌套。条目通过 `zipEntry` 指回原始记录，因此折叠后依然能正确读取内容。
 - **目录树能力**：隐式目录合并、显式目录记录去重、目录优先 + 自然排序、`role="tree"` 语义、↑↓←→ / Home / End / Enter 键盘导航与 roving tabindex。
-- **按需读取**：选中文件时才解压该条目；异步读取带请求序号，快速切换不会出现旧内容覆盖新内容。
+- **按需读取**：选中文件时才解压该条目；异步读取带请求序号，快速切换不会出现旧内容覆盖新内容；预览会叠加文档里的已保存改动。
 - **预览安全**：Markdown 渲染器不使用 `dangerouslySetInnerHTML`，文本一律转义，`javascript:` 等危险链接目标被丢弃；因此恶意压缩包无法通过预览注入脚本。
 - **大文件保护**：超过 2 MB 的文本、超过 20 MB 的图片不生成预览，改为提示 + 下载；图片用 `URL.createObjectURL` 并随选择切换 / 组件卸载回收。
 - **样式隔离**：所有样式限定在 `.se-root` 下，使用 CSS 变量，自带深色模式；容器宽度小于 560px 时（需容器查询支持）上下堆叠。
 
 ## 后续可扩展
 
-- 文件编辑与回写（导出修改后的 `.zip`）、`SKILL.md` 表单化编辑；
+- 新增 / 删除 / 重命名文件，`SKILL.md` 表单化编辑；
 - 目录树搜索与过滤（`SkillTreeNode.pathLower` 已预处理）；
 - Markdown 渲染器补充语法高亮、锚点目录；
 - 预览 Markdown 内部相对链接时直接跳转到对应文件。

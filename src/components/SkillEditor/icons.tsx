@@ -159,6 +159,33 @@ export function EyeIcon({ className }: IconProps) {
   );
 }
 
+export function PencilIcon({ className }: IconProps) {
+  return (
+    <svg {...baseProps} className={className}>
+      <path d="M4 20h4l10-10a2.1 2.1 0 0 0-3-3L5 17z" />
+      <path d="M13.5 6.5l4 4" />
+    </svg>
+  );
+}
+
+export function UndoIcon({ className }: IconProps) {
+  return (
+    <svg {...baseProps} className={className}>
+      <path d="M4 9h10.5a5 5 0 0 1 0 10H9" />
+      <path d="M7.5 5.5 4 9l3.5 3.5" />
+    </svg>
+  );
+}
+
+export function ListIcon({ className }: IconProps) {
+  return (
+    <svg {...baseProps} className={className}>
+      <path d="M5 6.5h.01M5 12h.01M5 17.5h.01" />
+      <path d="M9.5 6.5h9.5M9.5 12h9.5M9.5 17.5h9.5" />
+    </svg>
+  );
+}
+
 export function FileQuestionIcon({ className }: IconProps) {
   return (
     <svg {...baseProps} className={className}>

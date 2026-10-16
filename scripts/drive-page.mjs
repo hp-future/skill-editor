@@ -107,14 +107,31 @@ try {
   await sleep(1500);
 
   for (const [index, command] of commands.entries()) {
-    const { label, waitMs, screenshotPath, ...rest } = command;
+    const { label, waitMs, screenshotPath, saveTo, ...rest } = command;
     const params = { awaitPromise: true, returnByValue: true, ...rest };
-    const result = await send(command.method ?? 'Runtime.evaluate', params);
     const heading = `#${index + 1} ${label ?? command.method ?? ''}`;
+    let result;
+    try {
+      result = await send(command.method ?? 'Runtime.evaluate', params);
+    } catch (error) {
+      // A page that navigated or unloaded cannot answer; report and continue.
+      console.log(`${heading}: target went away (${error.message})`);
+      if (waitMs) await sleep(waitMs);
+      continue;
+    }
 
     if (screenshotPath) {
       await writeFile(screenshotPath, Buffer.from(result.data, 'base64'));
       console.log(`${heading}: wrote ${screenshotPath}`);
+    } else if (saveTo) {
+      // Persist a string result (e.g. base64 of a captured blob) verbatim.
+      const value = result.result?.value;
+      if (typeof value !== 'string') {
+        console.log(`${heading}: expected a string result, got ${typeof value}`);
+      } else {
+        await writeFile(saveTo, value);
+        console.log(`${heading}: wrote ${value.length} chars to ${saveTo}`);
+      }
     } else if (result.exceptionDetails) {
       console.log(`${heading} EXCEPTION`);
       console.log(
