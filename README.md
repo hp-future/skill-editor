@@ -35,6 +35,10 @@
 
 9. Markdown 内部相对链接直接跳转：点击 `references/api-index.md`、`./x.md`、`../SKILL.md` 即切换到对应文件，`#锚点` 在窗格内滚动。
 
+**第九阶段（已完成）**
+
+10. 独立脚本文件也按语法着色：`.ts` / `.sh`（以及 `.js` `.py` `.yaml` `.json` `.css` `.sql` `.ps1` `.go` 等约 40 种扩展名）在预览里带语言标记与配色，不再只有 Markdown 围栏代码块享受高亮。
+
 ![SkillEditor 目录树](docs/phase1.png)
 
 ## 文件编辑与导出
@@ -141,6 +145,19 @@ const ref = useRef<SkillEditorHandle>(null);
 ![锚点跳转](docs/phase8-anchor.png)
 
 ![失效链接提示](docs/phase8-broken.png)
+
+### 脚本文件的语法高亮（第九阶段）
+
+代码高亮不只作用于 Markdown 围栏代码块：选中 `.ts` / `.sh` 这类文件时，源码视图同样着色，并显示语言标记。
+
+- 语言由**扩展名推断**（约 40 种：`.ts` `.tsx` `.js` `.py` `.sh` `.bash` `.zsh` `.ps1` `.yaml` `.json` `.toml` `.ini` `.env` `.css` `.html` `.vue` `.xml` `.svg` `.md` `.sql` `.java` `.kt` `.cs` `.c` `.cpp` `.go` `.diff` …），无需宿主配置
+- 变量、字符串、注释、关键字、类型、函数名等在该语言下分别着色；`.txt` 与未知扩展名保持纯文本，不加标记
+- 宿主可用 `language` 属性覆盖推断结果（传 `null` 强制纯文本）
+- 组件同时导出 `languageForPath()` / `languageLabel()` / `highlight()` / `resolveLanguage()`，便于在别处复用同一套词法规则
+
+![.sh 文件高亮](docs/phase9-sh.png)
+
+![.ts 文件高亮](docs/phase9-ts.png)
 
 ## 快速开始
 

@@ -303,6 +303,79 @@ describe('<SkillEditor /> file preview', () => {
     expect(image.getAttribute('src')).toMatch(/^blob:|^data:/);
   });
 
+  it('highlights scripts by file type', async () => {
+    const script = [
+      '#!/usr/bin/env bash',
+      '# build the package',
+      'set -euo pipefail',
+      'target="$HOME/.config/skill"',
+      'mkdir -p $target',
+      'if [ -d $target ]; then',
+      '  echo "ready"',
+      'fi',
+    ].join('\n');
+    const typescript = [
+      '// build helper',
+      'export async function build(name: string): Promise<number> {',
+      '  const total = name.length + 1;',
+      '  return total;',
+      '}',
+    ].join('\n');
+    const file = createZipFile(
+      [
+        { name: 'demo-skill/scripts/build.sh', content: script },
+        { name: 'demo-skill/scripts/tool.ts', content: typescript },
+        { name: 'demo-skill/notes/readme.txt', content: 'plain text, no syntax' },
+      ],
+      'demo-skill.zip',
+    );
+    const ref = createRef<SkillEditorHandle>();
+    render(<SkillEditor ref={ref} source={file} />);
+    await waitForTree();
+    expandAll(ref);
+
+    // Shell file: `#` starts a comment, `$VAR`, keywords and strings colour in.
+    fireEvent.click(screen.getByRole('treeitem', { name: /build\.sh/ }));
+    const shell = (await waitFor(() => {
+      const element = document.querySelector('.se-preview__source');
+      expect(element?.getAttribute('data-language')).toBe('sh');
+      return element as HTMLElement;
+    })) as HTMLElement;
+    expect(shell.querySelector('.se-code__comment')?.textContent).toBe('#!/usr/bin/env bash');
+    // A bare expansion is a variable; inside double quotes it stays part of the
+    // string, because the longer match wins.
+    expect(shell.querySelector('.se-code__builtin')?.textContent).toBe('$target');
+    expect(
+      [...shell.querySelectorAll('.se-code__keyword')].map((node) => node.textContent),
+    ).toEqual(['set', 'if', 'then', 'fi']);
+    expect(shell.querySelector('.se-code__string')?.textContent).toBe('"$HOME/.config/skill"');
+    // Highlighting never alters the file text.
+    expect(shell.textContent).toBe(script);
+
+    // TypeScript file: keywords, strings and types.
+    fireEvent.click(screen.getByRole('treeitem', { name: /tool\.ts/ }));
+    const scriptView = (await waitFor(() => {
+      const element = document.querySelector('.se-preview__source');
+      expect(element?.textContent).toBe(typescript);
+      return element as HTMLElement;
+    })) as HTMLElement;
+    expect(scriptView.getAttribute('data-language')).toBe('ts');
+    expect(scriptView.querySelector('.se-code__comment')?.textContent).toBe('// build helper');
+    expect(scriptView.querySelector('.se-code__keyword')?.textContent).toBe('export');
+    expect(scriptView.querySelector('.se-code__number')?.textContent).toBe('1');
+
+    // Unknown/plain text stays uncoloured: no badge, no token spans.
+    fireEvent.click(screen.getByRole('treeitem', { name: /readme\.txt/ }));
+    await waitFor(() => {
+      expect(document.querySelector('.se-preview__source')?.textContent).toBe(
+        'plain text, no syntax',
+      );
+    });
+    const plain = document.querySelector('.se-preview__source') as HTMLElement;
+    expect(plain.getAttribute('data-language')).toBeNull();
+    expect(plain.querySelectorAll('code span').length).toBe(0);
+  });
+
   it('falls back to a notice for binary files', async () => {
     const file = createZipFile(
       [{ name: 'demo-skill/bin/tool.exe', content: BINARY, stored: true }],

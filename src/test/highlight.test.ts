@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { highlight, resolveLanguage, supportedLanguages } from '../lib/highlight';
+import {
+  highlight,
+  languageForPath,
+  resolveLanguage,
+  supportedLanguages,
+} from '../lib/highlight';
 
 /** Concatenating token values must always reproduce the input exactly. */
 const joined = (source: string, language: string): string =>
@@ -31,10 +36,56 @@ describe('resolveLanguage', () => {
     expect(resolveLanguage(null)).toBeNull();
   });
 
+  it('accepts canonical ids, not only fence aliases', () => {
+    // `languageForPath` hands back ids like `scriptType`; they must resolve
+    // through the same path as the `ts` alias.
+    for (const id of supportedLanguages()) {
+      expect(resolveLanguage(id)).toBe(id);
+      expect(resolveLanguage(id.toUpperCase())).toBe(id);
+    }
+    expect(resolveLanguage('scriptType')).toBe('scriptType');
+    expect(resolveLanguage('shell')).toBe('shell');
+  });
+
   it('lists the supported languages', () => {
     expect(supportedLanguages()).toContain('json');
     expect(supportedLanguages()).toContain('python');
     expect(supportedLanguages()).toContain('go');
+  });
+});
+
+describe('languageForPath', () => {
+  it('detects the languages a skill package actually ships', () => {
+    expect(languageForPath('scripts/run.ts')).toBe('scriptType');
+    expect(languageForPath('scripts/run.tsx')).toBe('scriptType');
+    expect(languageForPath('scripts/install.sh')).toBe('shell');
+    expect(languageForPath('scripts/install.bash')).toBe('shell');
+    expect(languageForPath('scripts/run.ps1')).toBe('powershell');
+    expect(languageForPath('agents/run.py')).toBe('python');
+    expect(languageForPath('assets/site.css')).toBe('css');
+    expect(languageForPath('data/records.json')).toBe('json');
+    expect(languageForPath('SKILL.md')).toBe('markdown');
+  });
+
+  it('is case-insensitive and ignores dots in directory names', () => {
+    expect(languageForPath('scripts/Build.TS')).toBe('scriptType');
+    expect(languageForPath('v1.2/setup.sh')).toBe('shell');
+  });
+
+  it('returns null when there is nothing to highlight with', () => {
+    expect(languageForPath('LICENSE')).toBeNull();
+    expect(languageForPath('Makefile')).toBeNull();
+    expect(languageForPath('archive.')).toBeNull();
+    expect(languageForPath('assets/logo.png')).toBeNull();
+    expect(languageForPath('data/records.xyz')).toBeNull();
+  });
+
+  it('maps plain text files to the text rule set', () => {
+    expect(languageForPath('notes/readme.txt')).toBe('text');
+    // Resolving a language must still leave plain text uncoloured.
+    expect(highlight('a -> b', languageForPath('notes/readme.txt')).tokens).toEqual([
+      { type: 'plain', value: 'a -> b' },
+    ]);
   });
 });
 

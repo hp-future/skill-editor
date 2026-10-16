@@ -68,7 +68,13 @@ export type {
   MarkdownOptions,
   RenderedMarkdown,
 } from './lib/markdown.tsx';
-export { highlight, resolveLanguage, supportedLanguages } from './lib/highlight';
+export {
+  highlight,
+  resolveLanguage,
+  supportedLanguages,
+  languageForPath,
+  languageLabel,
+} from './lib/highlight';
 export type { HighlightResult, Token, TokenType } from './lib/highlight';
 export { resolveLinkTarget, normalizeArchivePath } from './lib/linkTarget';
 export type { LinkTarget, LinkTargetKind } from './lib/linkTarget';

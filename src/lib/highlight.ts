@@ -103,8 +103,16 @@ const RULES: Record<string, Rule[]> = {
   ],
   shell: [
     { type: 'comment', pattern: /#[^\n]*/ },
-    { type: 'string', pattern: /"(?:\\[\s\S]|\$\([^)]*\)|[^\\"])*"|'[^']*'/ },
+    // Variables are listed before strings: both can start at `$`, and the
+    // longer match wins, so `"$USER"` stays one string while a bare `$HOME`
+    // is classified as a variable.
     { type: 'builtin', pattern: /\$(?:\{[^}]*\}|\w+|[@*#?$!])/ },
+    {
+      type: 'string',
+      // Quoted strings, plus bare `$(cmd)` substitutions that are not a plain
+      // variable reference.
+      pattern: /"(?:\\[\s\S]|\$\([^)]*\)|[^\\"])*"|'[^']*'|\$\([^)\n]*\)/,
+    },
     { type: 'keyword', pattern: new RegExp(`\\b(?:${SHELL_KEYWORDS})\\b`) },
     { type: 'operator', pattern: /\|\||&&|>>|>|<|;;|;|&|\|/ },
     { type: 'punctuation', pattern: /[{}[\]()]/ },
@@ -269,11 +277,111 @@ const LANGUAGE_ALIASES: Record<string, keyof typeof RULES> = {
 
 /* -------------------------------- scanner ------------------------------- */
 
-/** Resolve a fenced-block label to a canonical language id. */
+/**
+ * Canonical ids by lower-case form, so a case-insensitive lookup can reach the
+ * camelCase ids (`scriptType`) that `languageForPath` returns.
+ */
+const RULES_BY_LOWER_ID = new Map<string, keyof typeof RULES>(
+  (Object.keys(RULES) as (keyof typeof RULES)[]).map((id) => [id.toLowerCase(), id]),
+);
+
+/**
+ * Resolve a fence label *or* an already-canonical id to a rule set.
+ *
+ * Accepting both matters because `languageForPath` returns canonical ids
+ * (`scriptType`, `shell`) while Markdown fences use aliases (`ts`, `sh`).
+ */
 export function resolveLanguage(label: string | null | undefined): keyof typeof RULES | null {
   if (!label) return null;
   const key = label.trim().toLowerCase();
+  const canonical = RULES_BY_LOWER_ID.get(key);
+  if (canonical) return canonical;
   return LANGUAGE_ALIASES[key] ?? null;
+}
+
+/** File extensions that map onto a rule set, for highlighting whole files. */const EXTENSION_LANGUAGES: Record<string, keyof typeof RULES> = {
+  ts: 'scriptType',
+  mts: 'scriptType',
+  cts: 'scriptType',
+  tsx: 'scriptType',
+  js: 'script',
+  mjs: 'script',
+  cjs: 'script',
+  jsx: 'script',
+  json: 'json',
+  jsonc: 'json',
+  json5: 'json',
+  py: 'python',
+  sh: 'shell',
+  bash: 'shell',
+  zsh: 'shell',
+  ksh: 'shell',
+  ps1: 'powershell',
+  psm1: 'powershell',
+  yml: 'yaml',
+  yaml: 'yaml',
+  toml: 'toml',
+  ini: 'ini',
+  cfg: 'ini',
+  conf: 'ini',
+  env: 'ini',
+  properties: 'ini',
+  css: 'css',
+  scss: 'css',
+  less: 'css',
+  html: 'html',
+  htm: 'html',
+  vue: 'html',
+  svelte: 'html',
+  xml: 'xml',
+  svg: 'xml',
+  xsd: 'xml',
+  md: 'markdown',
+  markdown: 'markdown',
+  sql: 'sql',
+  java: 'java',
+  kt: 'java',
+  kts: 'java',
+  cs: 'java',
+  c: 'java',
+  h: 'java',
+  cpp: 'java',
+  cc: 'java',
+  hpp: 'java',
+  go: 'go',
+  diff: 'diff',
+  patch: 'diff',
+  txt: 'text',
+};
+
+/**
+ * Infer a language from a file name, so standalone `.ts` / `.sh` files can be
+ * highlighted exactly like fenced code blocks. Returns `null` when the file has
+ * no known syntax, which keeps callers in plain-text mode.
+ */
+export function languageForPath(path: string): keyof typeof RULES | null {
+  const name = path.slice(path.lastIndexOf('/') + 1);
+  const dot = name.lastIndexOf('.');
+  if (dot <= 0 || dot === name.length - 1) return null;
+  return EXTENSION_LANGUAGES[name.slice(dot + 1).toLowerCase()] ?? null;
+}
+
+/**
+ * Label to show for a resolved language. Rule sets are named after the family
+ * they belong to (`scriptType`), which is not what a reader expects to see on a
+ * `.ts` file.
+ */
+const LANGUAGE_LABELS: Partial<Record<keyof typeof RULES, string>> = {
+  scriptType: 'ts',
+  script: 'js',
+  shell: 'sh',
+  powershell: 'ps1',
+};
+
+/** Human-facing label for a canonical language id. */
+export function languageLabel(language: string | null | undefined): string | null {
+  if (!language) return null;
+  return LANGUAGE_LABELS[language as keyof typeof RULES] ?? language;
 }
 
 /** Split `source` into tokens for `language`; unknown languages stay plain. */

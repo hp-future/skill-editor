@@ -1,10 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { MouseEvent as ReactMouseEvent } from 'react';
 import { formatBytes } from '../../lib/format';
 import { mimeForPath, type FileKind } from '../../lib/fileKind';
 import { renderMarkdown } from '../../lib/markdown.tsx';
 import type { MarkdownHeading, MarkdownLink, RenderedMarkdown } from '../../lib/markdown.tsx';
 import { isExternalHref } from '../../lib/markdown.tsx';
+import { highlight, languageForPath, languageLabel } from '../../lib/highlight';
+import type { Token } from '../../lib/highlight';
 import { resolveLinkTarget } from '../../lib/linkTarget';
 import {
   AlertIcon,
@@ -74,6 +76,12 @@ export interface FilePreviewProps {
    * instead of leaving the click silently dead.
    */
   readonly onNavigate?: (target: { path: string; fragment: string | null }) => boolean;
+  /**
+   * Language of the file itself, used to highlight the source view. Defaults to
+   * a guess from the file name, so a `.ts` or `.sh` preview is coloured without
+   * the host doing anything.
+   */
+  readonly language?: string | null;
   /** Replaces the built-in body entirely. */
   readonly renderBody?: (props: FilePreviewProps) => React.ReactNode;
 }
@@ -82,6 +90,19 @@ export interface FilePreviewProps {
 const FLASH_MS = 900;
 /** Grace period before jumping to a heading in a freshly opened file. */
 const LINK_JUMP_DELAY_MS = 160;
+
+/** Render highlighted code: plain runs stay text, everything else gets a span. */
+function renderTokens(tokens: readonly Token[], keyPrefix: string): React.ReactNode[] {
+  return tokens.map((token, index) =>
+    token.type === 'plain' ? (
+      <Fragment key={`${keyPrefix}-${index}`}>{token.value}</Fragment>
+    ) : (
+      <span key={`${keyPrefix}-${index}`} className={`se-code__${token.type}`}>
+        {token.value}
+      </span>
+    ),
+  );
+}
 
 /** Save bytes to disk, using the File System Access API when available. */
 async function saveBlob(blob: Blob, fileName: string): Promise<void> {
@@ -157,6 +178,7 @@ export function FilePreview(props: FilePreviewProps) {
     links: linksProp,
     headings: headingsProp,
     onNavigate,
+    language,
     renderBody,
   } = props;
 
@@ -329,6 +351,17 @@ export function FilePreview(props: FilePreviewProps) {
   };
 
   const sourceText = typeof text === 'string' ? text : '';
+
+  /**
+   * Syntax for the source view: the host wins, then the file name decides.
+   * A `.ts` or `.sh` file gets the same palette its fenced block would get.
+   */
+  const sourceLanguage = language !== undefined ? language : languageForPath(path);
+  const sourceTokens = useMemo(
+    () => highlight(sourceText, sourceLanguage),
+    [sourceText, sourceLanguage],
+  );
+  const hasHighlight = sourceTokens.language !== null && sourceTokens.language !== 'text';
 
   return (
     <div className={['se-preview', className].filter(Boolean).join(' ')}>
@@ -540,8 +573,16 @@ export function FilePreview(props: FilePreviewProps) {
                   {markdown.nodes}
                 </article>
               ) : (
-                <pre className="se-preview__source" tabIndex={0}>
-                  <code>{sourceText}</code>
+                <pre
+                  className="se-preview__source"
+                  data-language={
+                    hasHighlight ? (languageLabel(sourceTokens.language) ?? undefined) : undefined
+                  }
+                  tabIndex={0}
+                >
+                  <code>
+                    {hasHighlight ? renderTokens(sourceTokens.tokens, 'src') : sourceText}
+                  </code>
                 </pre>
               )}
             </div>

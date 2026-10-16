@@ -51,10 +51,39 @@ const index = [
   '| api.md | 接口总览 |',
 ].join('\n');
 
+// Scripts, so the browser check can confirm file-level syntax highlighting.
+const shell = [
+  '#!/usr/bin/env bash',
+  '# build the skill package',
+  'set -euo pipefail',
+  'out="$HOME/dist/skill.zip"',
+  'mkdir -p $out',
+  'if [ -f "$out" ]; then',
+  '  echo "replacing $out"',
+  'fi',
+].join('\n');
+
+const typescript = [
+  "import { createHash } from 'node:crypto';",
+  '',
+  'export interface BuildOptions {',
+  '  readonly name: string;',
+  '  readonly files: number;',
+  '}',
+  '',
+  '// Build the archive name for a package.',
+  'export function buildName(options: BuildOptions): string {',
+  '  const digest = createHash("sha1").update(options.name).digest("hex");',
+  '  return `${options.name}-${digest.slice(0, 8)}.zip`;',
+  '}',
+].join('\n');
+
 const zip = createZip([
   { name: 'link-demo/SKILL.md', content: skill },
   { name: 'link-demo/references/api-index.md', content: index },
   { name: 'link-demo/agents/openai.yaml', content: 'interface:\n  display_name: 链接演示\n' },
+  { name: 'link-demo/scripts/build.sh', content: shell },
+  { name: 'link-demo/scripts/tool.ts', content: typescript },
 ]);
 
 const out = process.argv[2] ?? 'link-demo.zip';

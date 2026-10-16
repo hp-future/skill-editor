@@ -310,6 +310,17 @@
   white-space: pre;
 }
 
+/* Language badge for highlighted files, matching fenced blocks in Markdown. */
+.se-preview__source[data-language]::before {
+  content: attr(data-language);
+  display: block;
+  margin-block-end: 6px;
+  color: var(--se-text-faint);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
 .se-preview__source:focus-visible {
   outline: 2px solid var(--se-accent);
   outline-offset: -2px;
@@ -513,47 +524,60 @@
 
 /* ---------------------------- code highlighting -------------------------- */
 
-.se-md__pre code .se-code__comment {
+/* Applies to fenced blocks in Markdown and to highlighted source files. */
+.se-md__pre code .se-code__comment,
+.se-preview__source code .se-code__comment {
   color: var(--se-code-comment);
   font-style: italic;
 }
 
-.se-md__pre code .se-code__string {
+.se-md__pre code .se-code__string,
+.se-preview__source code .se-code__string {
   color: var(--se-code-string);
 }
 
-.se-md__pre code .se-code__number {
+.se-md__pre code .se-code__number,
+.se-preview__source code .se-code__number {
   color: var(--se-code-number);
 }
 
-.se-md__pre code .se-code__keyword {
+.se-md__pre code .se-code__keyword,
+.se-preview__source code .se-code__keyword {
   color: var(--se-code-keyword);
   font-weight: 600;
 }
 
-.se-md__pre code .se-code__builtin {
+.se-md__pre code .se-code__builtin,
+.se-preview__source code .se-code__builtin {
   color: var(--se-code-builtin);
 }
 
-.se-md__pre code .se-code__function {
+.se-md__pre code .se-code__function,
+.se-preview__source code .se-code__function {
   color: var(--se-code-function);
 }
 
-.se-md__pre code .se-code__type {
+.se-md__pre code .se-code__type,
+.se-preview__source code .se-code__type {
   color: var(--se-code-type);
 }
 
 .se-md__pre code .se-code__property,
-.se-md__pre code .se-code__attribute {
+.se-md__pre code .se-code__attribute,
+.se-preview__source code .se-code__property,
+.se-preview__source code .se-code__attribute {
   color: var(--se-code-property);
 }
 
-.se-md__pre code .se-code__tag {
+.se-md__pre code .se-code__tag,
+.se-preview__source code .se-code__tag {
   color: var(--se-code-keyword);
 }
 
 .se-md__pre code .se-code__operator,
-.se-md__pre code .se-code__punctuation {
+.se-md__pre code .se-code__punctuation,
+.se-preview__source code .se-code__operator,
+.se-preview__source code .se-code__punctuation {
   color: var(--se-code-punctuation);
 }
 
