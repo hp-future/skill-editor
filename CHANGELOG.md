@@ -23,6 +23,7 @@
 
 ### 变更
 
+- 包名使用 npm 作用域：`@hp-future/skill-editor`，并声明 `publishConfig.access: "public"`，保证作用域包可公开发布。
 - 顶部工具栏移出组件，改由宿主提供（4）。
 - 目录区域移除文件选择入口与隐藏 input，文件只能通过 `source` 传入（5）。
 - 目录树移除体积统计文案与 SKILL.md 说明文案，空状态只保留一句提示（3、4、5）。

@@ -1,5 +1,5 @@
 {
-  "name": "skill-editor",
+  "name": "@hp-future/skill-editor",
   "version": "0.1.0",
   "description": "React 组件：载入 .zip 技能包并展示其目录树",
   "type": "module",
@@ -25,6 +25,9 @@
     "dist",
     "dist-types"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
   "sideEffects": [
     "*.css"
   ],
@@ -34,7 +37,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "inspect": "node --experimental-strip-types scripts/inspect-zip.mts"
+    "inspect": "node --experimental-strip-types scripts/inspect-zip.mts",
+    "prepublishOnly": "pnpm run typecheck && pnpm test && pnpm run build"
   },
   "keywords": [
     "react",

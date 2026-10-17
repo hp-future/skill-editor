@@ -1,4 +1,4 @@
-# skill-editor
+# @hp-future/skill-editor
 
 [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![react](https://img.shields.io/badge/react-18%20%7C%2019-61dafb.svg)](package.json)
@@ -26,11 +26,13 @@
 ## 安装
 
 ```bash
-pnpm add skill-editor
-# 或：npm install skill-editor
+pnpm add @hp-future/skill-editor
+# 或：npm install @hp-future/skill-editor
 ```
 
-React 18 / 19 为 peer 依赖，需由宿主提供；样式单独引入 `skill-editor/style.css`。
+> 该包尚未发布到 npm（registry 目前返回 404）。发布前请按下文从仓库构建，再用本地路径引入。
+
+React 18 / 19 为 peer 依赖，需由宿主提供；样式单独引入 `@hp-future/skill-editor/style.css`。
 
 需要基于源码调试时，可克隆仓库后本地构建：
 
@@ -46,9 +48,9 @@ pnpm add file:../skill-editor  # 在你的项目里本地引用
 
 ```tsx
 import { useRef, useState } from 'react';
-import { SkillEditor } from 'skill-editor';
-import type { SkillEditorHandle } from 'skill-editor';
-import 'skill-editor/style.css';
+import { SkillEditor } from '@hp-future/skill-editor';
+import type { SkillEditorHandle } from '@hp-future/skill-editor';
+import '@hp-future/skill-editor/style.css';
 
 export function Page() {
   const [file, setFile] = useState<File | null>(null);
@@ -128,7 +130,7 @@ export function Page() {
 内置预览只处理 Markdown / 文本 / 图片，其余显示「二进制内容，暂不支持预览」。通过 `previewers` 可以接管任意格式：
 
 ```tsx
-import { SkillEditor, byExtension } from 'skill-editor';
+import { SkillEditor, byExtension } from '@hp-future/skill-editor';
 
 const fontPreviewer = {
   id: 'font',
