@@ -3,6 +3,12 @@
 本文件格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.1.2] - 2026-10-18
+
+### 变更
+
+- README 增加 npm 包页面链接，方便从仓库跳转到安装入口。
+
 ## [0.1.1] - 2026-10-18
 
 ### 修复
