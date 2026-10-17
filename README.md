@@ -13,24 +13,10 @@
 
 ## 安装
 
-尚未发布到 npm，请从仓库构建后本地引用：
-
-```bash
-git clone https://github.com/hp-future/skill-editor.git
-cd skill-editor
-pnpm install
-pnpm build
-```
-
-```bash
-# 在目标项目里
-pnpm add file:../skill-editor
-```
-
-发布后可直接安装：
-
 ```bash
 pnpm add @hp-future/skill-editor
+# 或
+npm install @hp-future/skill-editor
 ```
 
 React 18 / 19 为 peer 依赖。样式需单独引入：
@@ -38,6 +24,8 @@ React 18 / 19 为 peer 依赖。样式需单独引入：
 ```ts
 import '@hp-future/skill-editor/style.css';
 ```
+
+基于源码调试时，克隆仓库后 `pnpm install && pnpm build`，再用 `pnpm add file:../skill-editor` 引用。
 
 ## 使用
 
