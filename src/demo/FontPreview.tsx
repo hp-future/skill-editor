@@ -58,7 +58,6 @@ export function FontPreview({ info, objectUrl }: CustomPreviewProps) {
   return (
     <div className="demo-font" data-testid="demo-font-preview">
       <header className="demo-font__head">
-        <span className="demo-font__badge">自定义预览 · 字体</span>
         <span className="demo-font__meta">
           {info.name} · {formatBytes(info.size)} · .{info.extension}
         </span>
@@ -82,9 +81,7 @@ export function FontPreview({ info, objectUrl }: CustomPreviewProps) {
               </span>
             </div>
           ))}
-          <p className="demo-font__note">
-            该演示字体只包含 A B E S 0 1 等字形，其余字符由系统字体回退显示。
-          </p>
+          <p className="demo-font__note">缺失字形由系统字体回退显示。</p>
         </div>
       )}
     </div>

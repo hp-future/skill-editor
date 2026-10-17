@@ -5,7 +5,7 @@ import type { SkillArchiveResult } from '../lib/loadSkillArchive';
 import type { SkillTreeNode } from '../lib/skillTree';
 import { formatBytes } from '../lib/format';
 import { fontPreviewer } from './FontPreview';
-import { ArchiveIcon, CloseIcon, DownloadIcon, UploadIcon } from './icons';
+import { ArchiveIcon } from './icons';
 import sampleZipUrl from './sample/api-call-by-knowledge.zip?url';
 import './styles.css';
 
@@ -131,31 +131,21 @@ export function DemoApp() {
 
   return (
     <div className="demo">
-      <header className="demo__header">
-        <div>
-          <h1>SkillEditor 组件演示</h1>
-          <p>
-            工具栏由宿主提供：文件从外部传入，组件负责目录树、文件预览与编辑；导出由宿主持有 Blob 后自行下载。
-          </p>
-        </div>
-      </header>
-
       <div className="demo__toolbar">
         <div className="demo__toolbar-identity">
-          <ArchiveIcon className="demo__icon demo__icon--brand" />
+          <ArchiveIcon className="demo__icon" />
           <div className="demo__toolbar-titles">
-            <span className="demo__toolbar-title">{file?.name ?? 'Skill Editor'}</span>
+            <span className="demo__toolbar-title">{file?.name ?? 'SkillEditor'}</span>
             <span className="demo__toolbar-subtitle">
               {result
-                ? `${result.tree.rootName} · ${result.tree.folderCount} 个目录 / ${result.tree.fileCount} 个文件 · ${formatBytes(result.tree.totalSize)}${edits.count > 0 ? ` · 已修改 ${edits.count} 个文件` : ''}`
-                : '上传 .zip 技能包以查看目录结构'}
+                ? `${result.tree.folderCount} 个目录 · ${result.tree.fileCount} 个文件 · ${formatBytes(result.tree.totalSize)}`
+                : '未载入技能包'}
             </span>
           </div>
         </div>
         <div className="demo__toolbar-actions">
           <label className="demo__button" htmlFor={inputId}>
-            <UploadIcon className="demo__icon" />
-            <span>选择 .zip 文件</span>
+            选择 .zip
           </label>
           <input
             id={inputId}
@@ -175,13 +165,11 @@ export function DemoApp() {
             title={edits.dirty ? `导出包含 ${edits.count} 个已修改文件的新压缩包` : '导出当前压缩包'}
             onClick={() => void exportArchive()}
           >
-            <DownloadIcon className="demo__icon" />
-            <span>{exporting ? '正在打包…' : '导出 .zip'}</span>
+            {exporting ? '正在打包…' : '导出'}
           </button>
           {file && (
             <button type="button" className="demo__button demo__button--ghost" onClick={clear}>
-              <CloseIcon className="demo__icon" />
-              <span>清除</span>
+              清除
             </button>
           )}
         </div>
@@ -206,48 +194,20 @@ export function DemoApp() {
         />
       </main>
 
-      <footer className="demo__meta">
-        <div className="demo__meta-item">
-          <span className="demo__meta-label">文件</span>
-          <span className="demo__meta-value">{file?.name ?? '—'}</span>
-        </div>
-        <div className="demo__meta-item">
-          <span className="demo__meta-label">文件数</span>
-          <span className="demo__meta-value">{result?.tree.fileCount ?? '—'}</span>
-        </div>
-        <div className="demo__meta-item">
-          <span className="demo__meta-label">目录数</span>
-          <span className="demo__meta-value">{result?.tree.folderCount ?? '—'}</span>
-        </div>
-        <div className="demo__meta-item demo__meta-item--wide">
-          <span className="demo__meta-label">SKILL.md</span>
-          <span className="demo__meta-value">
-            {result ? (result.hasManifest ? result.manifest?.path : '未找到') : '—'}
+      {(selected || error || exportNotice || edits.count > 0) && (
+        <footer className="demo__status">
+          <span className="demo__status-path">{selected?.path ?? ''}</span>
+          <span className="demo__status-right">
+            {error ? (
+              <span className="demo__status-error">{error}</span>
+            ) : exportNotice ? (
+              <span>{exportNotice}</span>
+            ) : edits.count > 0 ? (
+              <span>{edits.count} 个文件未导出</span>
+            ) : null}
           </span>
-        </div>
-        <div className="demo__meta-item demo__meta-item--wide">
-          <span className="demo__meta-label">选中节点</span>
-          <span className="demo__meta-value">{selected?.path ?? '—'}</span>
-        </div>
-        <div className="demo__meta-item demo__meta-item--wide">
-          <span className="demo__meta-label">未导出的修改</span>
-          <span className="demo__meta-value">
-            {edits.count === 0 ? '无' : `${edits.count} 个：${edits.paths.join('、')}`}
-          </span>
-        </div>
-        {exportNotice && (
-          <div className="demo__meta-item demo__meta-item--wide">
-            <span className="demo__meta-label">导出</span>
-            <span className="demo__meta-value">{exportNotice}</span>
-          </div>
-        )}
-        {error && (
-          <div className="demo__meta-item demo__meta-item--error">
-            <span className="demo__meta-label">错误</span>
-            <span className="demo__meta-value">{error}</span>
-          </div>
-        )}
-      </footer>
+        </footer>
+      )}
     </div>
   );
 }

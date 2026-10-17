@@ -8,7 +8,7 @@
  */
 import { createElement, Fragment, type ReactNode } from 'react';
 import { parseFrontmatter } from './frontmatter';
-import { highlight } from './highlight';
+import { highlight, languageLabel, resolveLanguage } from './highlight';
 
 export interface MarkdownHeading {
   readonly id: string;
@@ -436,13 +436,18 @@ export function renderMarkdown(source: string, options: MarkdownOptions = {}): R
           </p>,
         );
         break;
-      case 'code':
+      case 'code': {
+        // Only label blocks that actually have syntax; a plain ```text fence
+        // needs no badge.
+        const resolved = resolveLanguage(block.language);
+        const badge = resolved && resolved !== 'text' ? languageLabel(resolved) : null;
         nodes.push(
-          <pre key={key} className="se-md__pre" data-language={block.language ?? undefined}>
+          <pre key={key} className="se-md__pre" data-language={badge ?? undefined}>
             <code>{renderCode(block.lines.join('\n'), block.language, key)}</code>
           </pre>,
         );
         break;
+      }
       case 'rule':
         nodes.push(<hr key={key} className="se-md__rule" />);
         break;

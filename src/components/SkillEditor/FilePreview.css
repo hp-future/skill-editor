@@ -323,9 +323,7 @@
   display: block;
   margin-block-end: 6px;
   color: var(--se-text-faint);
-  font-size: 10px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  font-size: 10.5px;
 }
 
 .se-preview__source:focus-visible {
@@ -492,9 +490,7 @@
   display: block;
   margin-block-end: 6px;
   color: var(--se-text-faint);
-  font-size: 10px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  font-size: 10.5px;
 }
 
 .se-md__link {
