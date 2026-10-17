@@ -1,7 +1,8 @@
 # @hp-future/skill-editor
 
-[![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![react](https://img.shields.io/badge/react-18%20%7C%2019-61dafb.svg)](package.json)
+[![demo](https://img.shields.io/badge/demo-online-brightgreen.svg)](https://hp-future.github.io/skill-editor/)
+[![license](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/hp-future/skill-editor/blob/main/LICENSE)
+[![react](https://img.shields.io/badge/react-18%20%7C%2019-61dafb.svg)](https://github.com/hp-future/skill-editor/blob/main/package.json)
 [![bundle](https://img.shields.io/badge/bundle-28%20kB%20gzip-informational.svg)](https://github.com/hp-future/skill-editor)
 [![tests](https://img.shields.io/badge/tests-168%20passing-brightgreen.svg)](#本地开发)
 
@@ -9,9 +10,15 @@
 
 文件始终由宿主传入——组件不提供任何文件选择入口，也不替宿主下载，边界清晰、便于嵌入已有页面。
 
-在线演示：<https://hp-future.github.io/skill-editor/>（推送 `main` 后由 GitHub Actions 自动构建发布）
+![SkillEditor 目录树](https://raw.githubusercontent.com/hp-future/skill-editor/main/docs/phase1.png)
 
-![SkillEditor 目录树](docs/phase1.png)
+## 在线演示
+
+**[👉 打开在线演示](https://hp-future.github.io/skill-editor/)**
+
+- 地址：https://hp-future.github.io/skill-editor/
+- 演示页源码在 [`src/demo`](https://github.com/hp-future/skill-editor/blob/main/src/demo)，推送到 `main` 后由 GitHub Actions 自动构建并发布到 GitHub Pages
+- 演示包默认载入 `api-call-by-knowledge.zip`；工具栏还提供「载入字体示例」用于查看宿主自定义预览组件
 
 ## 特性
 
@@ -155,7 +162,7 @@ const fontPreviewer = {
 
 演示页点「载入字体示例」会现场生成一个包含 `fonts/SkillDemo.ttf` 的技能包，可直接验证：
 
-![自定义字体预览](docs/phase10-font.png)
+![自定义字体预览](https://raw.githubusercontent.com/hp-future/skill-editor/main/docs/phase10-font.png)
 
 ## Markdown 渲染
 
@@ -165,13 +172,13 @@ const fontPreviewer = {
 | 代码高亮 | 围栏代码块按语言着色；`.ts` / `.sh` 等独立文件同样着色，未识别语言保持纯文本 |
 | 包内链接 | 相对链接切换到对应文件，`#锚点` 在当前文档内滚动；外部链接新标签打开；失效链接给出提示而不跳走 |
 
-![代码高亮](docs/phase7-code.png)
+![代码高亮](https://raw.githubusercontent.com/hp-future/skill-editor/main/docs/phase7-code.png)
 
-![大纲跳转](docs/phase7-toc.png)
+![大纲跳转](https://raw.githubusercontent.com/hp-future/skill-editor/main/docs/phase7-toc.png)
 
-![包内链接](docs/phase8-links.png)
+![包内链接](https://raw.githubusercontent.com/hp-future/skill-editor/main/docs/phase8-links.png)
 
-![脚本文件高亮](docs/phase9-ts.png)
+![脚本文件高亮](https://raw.githubusercontent.com/hp-future/skill-editor/main/docs/phase9-ts.png)
 
 ## 编辑与导出
 
@@ -184,9 +191,9 @@ const fontPreviewer = {
 | 撤销 | 预览头部「撤销对该文件的修改」把该文件还原为压缩包原始内容 |
 | 导出 | 未改动条目按原始 DEFLATE 字节回写，CRC 与内容逐字节一致；改动条目重新压缩 |
 
-![编辑视图](docs/phase6-editor.png)
+![编辑视图](https://raw.githubusercontent.com/hp-future/skill-editor/main/docs/phase6-editor.png)
 
-![导出前确认](docs/phase6-dialog.png)
+![导出前确认](https://raw.githubusercontent.com/hp-future/skill-editor/main/docs/phase6-dialog.png)
 
 ## 主题定制
 
@@ -308,8 +315,8 @@ src/
 
 ## 许可证
 
-基于 [MIT](LICENSE) 许可发布。
+基于 [MIT](https://github.com/hp-future/skill-editor/blob/main/LICENSE) 许可发布。
 
 ## 更新日志
 
-见 [CHANGELOG.md](CHANGELOG.md)。
+见 [CHANGELOG.md](https://github.com/hp-future/skill-editor/blob/main/CHANGELOG.md)。
