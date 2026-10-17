@@ -3,17 +3,7 @@
 本文件格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
-## [Unreleased]
-
-### 新增
-
-- 左右两栏支持拖拽调整宽度：分隔条拖动、方向键（每次 24px）、`Home`/`End` 到最窄/最宽、`Enter` 或双击恢复默认；默认宽度为容器的 28%（约束 200–400px）。新增 `defaultTreeWidth` 与 `onTreeWidthChange` 两个属性。
-
-### 修复
-
-- 窄容器（≤560px）的上下堆叠布局此前从未生效——`.se-root` 缺少 `container-type: inline-size`，`@container` 规则无法命中。
-
-## [0.1.0]
+## [0.1.0] - 2026-10-17
 
 首个公开版本。以下按能力分组，括号内为开发阶段编号。
 
@@ -29,6 +19,7 @@
 - **包内链接跳转**：Markdown 相对链接（`x.md`、`./x.md`、`../x.md`、`#锚点`）在窗格内导航，失效链接给出提示（8）。
 - **整文件高亮**：`.ts` / `.sh` 等约 40 种扩展名的独立文件按语言着色，带语言标记（9）。
 - **自定义预览组件**：`previewers` 按扩展名或自定义条件注册预览器，载荷读取上限 20 MB，命中优先级高于 `renderFilePreview`（10）。
+- **可拖拽分栏**：左右两栏支持拖拽调整宽度；分隔条拖动、方向键（每次 24px）、`Home`/`End` 到最窄/最宽、`Enter` 或双击恢复默认。默认宽度为容器的 28%（约束 200–400px），新增 `defaultTreeWidth` 与 `onTreeWidthChange` 两个属性（11）。
 
 ### 变更
 
@@ -42,3 +33,4 @@
 - 保存后预览仍显示压缩包原文，改为叠加已保存改动（6）。
 - `SkillDocument.isDirty()` 使用树路径而非归档路径查询，导致脏标记缺失（6）。
 - `resolveLanguage()` 只接受围栏别名，不接受 `languageForPath()` 返回的规范 id（9）。
+- 窄容器（≤560px）的上下堆叠布局此前从未生效——`.se-root` 缺少 `container-type: inline-size`，`@container` 规则无法命中（11）。

@@ -25,21 +25,22 @@
 
 ## 安装
 
-> 组件尚未发布到 npm，当前请从仓库构建后本地引用。
+```bash
+pnpm add skill-editor
+# 或：npm install skill-editor
+```
+
+React 18 / 19 为 peer 依赖，需由宿主提供；样式单独引入 `skill-editor/style.css`。
+
+需要基于源码调试时，可克隆仓库后本地构建：
 
 ```bash
 git clone https://github.com/hp-future/skill-editor.git
 cd skill-editor
 pnpm install
 pnpm build        # 产出 dist/ 与 dist-types/
+pnpm add file:../skill-editor  # 在你的项目里本地引用
 ```
-
-```bash
-# 在你的项目里本地引用
-pnpm add file:../skill-editor
-```
-
-发布后将支持 `pnpm add skill-editor`。React 18 / 19 为 peer 依赖，需由宿主提供。
 
 ## 快速开始
 
