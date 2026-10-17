@@ -3,6 +3,14 @@
   "version": "0.1.0",
   "description": "React 组件：载入 .zip 技能包并展示其目录树",
   "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hp-future/skill-editor.git"
+  },
+  "homepage": "https://github.com/hp-future/skill-editor#readme",
+  "bugs": {
+    "url": "https://github.com/hp-future/skill-editor/issues"
+  },
   "main": "./dist/skill-editor.js",
   "module": "./dist/skill-editor.js",
   "types": "./dist-types/index.d.ts",
@@ -30,12 +38,18 @@
   },
   "keywords": [
     "react",
+    "react-component",
     "zip",
+    "zip-archive",
     "skill",
-    "tree"
+    "skill-package",
+    "file-tree",
+    "markdown",
+    "preview",
+    "editor"
   ],
-  "author": "",
-  "license": "ISC",
+  "author": "hp-future",
+  "license": "MIT",
   "devEngines": {
     "packageManager": {
       "name": "pnpm",
