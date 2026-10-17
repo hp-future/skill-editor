@@ -9,6 +9,8 @@
 
 在线演示：<https://hp-future.github.io/skill-editor/>
 
+npm：<https://www.npmjs.com/package/@hp-future/skill-editor>
+
 ![SkillEditor](https://raw.githubusercontent.com/hp-future/skill-editor/main/docs/phase11-default.png)
 
 ## 安装
