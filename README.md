@@ -9,6 +9,8 @@
 
 文件始终由宿主传入——组件不提供任何文件选择入口，也不替宿主下载，边界清晰、便于嵌入已有页面。
 
+在线演示：<https://hp-future.github.io/skill-editor/>（推送 `main` 后由 GitHub Actions 自动构建发布）
+
 ![SkillEditor 目录树](docs/phase1.png)
 
 ## 特性
@@ -261,6 +263,17 @@ pnpm build      # 产出 dist/ 组件包 + dist-types/ 类型声明
 ```
 
 不强制使用 pnpm：`npm install` 后用 `npm run dev` / `npm test` / `npm run build` 等价，yarn 同理。仓库以 `pnpm-lock.yaml` 为准，提交时请勿附带 `package-lock.json` 或 `yarn.lock`。
+
+## 在线演示（GitHub Pages）
+
+演示页是纯静态站点，由 `vite.demo.config.ts` 单独构建到 `dist-demo/`（组件库的 `pnpm build` 不受影响）：
+
+```bash
+pnpm build:demo    # 产出 dist-demo/，base 默认为 /skill-editor/
+pnpm preview:demo  # 本地预览构建产物 http://localhost:4173/skill-editor/
+```
+
+`.github/workflows/deploy-demo.yml` 会在每次推送到 `main`（或手动触发）时构建并部署到 GitHub Pages，首次运行会自动开启 Pages。仓库改名、改用自定义域名或换静态托管时，用 `pnpm build:demo --base=/` 覆盖 `base` 即可。
 
 演示页（`src/demo`）自带宿主工具栏：选择 `.zip`、载入示例包、载入字体示例、导出、清除。
 
