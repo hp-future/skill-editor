@@ -5,7 +5,13 @@
 
 ## [Unreleased]
 
-暂无。
+### 新增
+
+- 左右两栏支持拖拽调整宽度：分隔条拖动、方向键（每次 24px）、`Home`/`End` 到最窄/最宽、`Enter` 或双击恢复默认；默认宽度为容器的 28%（约束 200–400px）。新增 `defaultTreeWidth` 与 `onTreeWidthChange` 两个属性。
+
+### 修复
+
+- 窄容器（≤560px）的上下堆叠布局此前从未生效——`.se-root` 缺少 `container-type: inline-size`，`@container` 规则无法命中。
 
 ## [0.1.0]
 

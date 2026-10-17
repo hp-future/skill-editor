@@ -3,11 +3,18 @@ import {
   useCallback,
   useEffect,
   useImperativeHandle,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
 } from 'react';
-import type { CSSProperties, DragEvent, KeyboardEvent, ReactNode } from 'react';
+import type {
+  CSSProperties,
+  DragEvent,
+  KeyboardEvent,
+  PointerEvent as ReactPointerEvent,
+  ReactNode,
+} from 'react';
 import { loadSkillArchive } from '../../lib/loadSkillArchive';
 import type { SkillArchiveResult } from '../../lib/loadSkillArchive';
 import { SkillDocument } from '../../lib/document/skillDocument';
@@ -145,9 +152,30 @@ export interface SkillEditorProps {
   hideExpandToggle?: boolean;
   /** Rendered when no archive has been loaded. */
   emptyState?: ReactNode;
+  /**
+   * Initial width of the tree pane in px. Defaults to 30% of the container,
+   * clamped to a usable range; the splitter stays draggable either way.
+   */
+  defaultTreeWidth?: number;
+  /** Called with the tree width after a drag ends or a keyboard resize. */
+  onTreeWidthChange?: (width: number) => void;
 }
 
 const DEFAULT_MAX_SIZE = 100 * 1024 * 1024;
+
+/** Share of the body width the tree pane starts with. */
+const DEFAULT_TREE_RATIO = 0.28;
+/** Cap for the ratio-derived default, so wide screens keep a narrow sidebar. */
+const MAX_DEFAULT_TREE_WIDTH = 400;
+/** Smallest usable tree pane, in px. */
+const MIN_TREE_WIDTH = 200;
+/** Width the detail pane keeps at minimum, in px. */
+const MIN_DETAIL_WIDTH = 360;
+/** Arrow-key step for the splitter, in px. */
+const TREE_WIDTH_STEP = 24;
+
+/** `useLayoutEffect` that does not warn during server rendering. */
+const useIsomorphicLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;
 
 function isZipLikeFile(file: File): boolean {
   if (/\.zip$/i.test(file.name)) return true;
@@ -237,6 +265,8 @@ export const SkillEditor = forwardRef<SkillEditorHandle, SkillEditorProps>(
       defaultExpandedDepth = 1,
       hideExpandToggle = false,
       emptyState,
+      defaultTreeWidth,
+      onTreeWidthChange,
     } = props;
 
     // The host owns the file; the editor only ever reads `source`.
@@ -253,6 +283,10 @@ export const SkillEditor = forwardRef<SkillEditorHandle, SkillEditorProps>(
     const [editing, setEditing] = useState(false);
     const [dirtyCount, setDirtyCount] = useState(0);
     const [exporting, setExporting] = useState(false);
+    /** Measured width of the tree pane in px; `null` falls back to the CSS ratio. */
+    const [treeWidth, setTreeWidth] = useState<number | null>(null);
+    const [bodyWidth, setBodyWidth] = useState(0);
+    const [resizing, setResizing] = useState(false);
 
     const latestSource = useRef<Blob | ArrayBuffer | null>(null);
     const loadId = useRef(0);
@@ -263,6 +297,14 @@ export const SkillEditor = forwardRef<SkillEditorHandle, SkillEditorProps>(
     const documentRef = useRef<SkillDocument | null>(null);
     const editorDraftRef = useRef<{ text: string; saved: string } | undefined>(undefined);
     const defaultDepthRef = useRef(defaultExpandedDepth);
+    /** The split's two panes, used to measure and clamp the dragged width. */
+    const bodyRef = useRef<HTMLDivElement | null>(null);
+    const treePanelRef = useRef<HTMLElement | null>(null);
+    const splitterRef = useRef<HTMLDivElement | null>(null);
+    /** Set once the user drags or resizes, so the ratio stops overriding them. */
+    const userSizedRef = useRef(false);
+    const dragStateRef = useRef<{ startX: number; startWidth: number } | null>(null);
+    const lastWidthRef = useRef<number | null>(null);
 
     onLoadRef.current = onLoad;
     onErrorRef.current = onError;
@@ -270,6 +312,61 @@ export const SkillEditor = forwardRef<SkillEditorHandle, SkillEditorProps>(
     onEditChangeRef.current = onEditChange;
     documentRef.current = document;
     defaultDepthRef.current = defaultExpandedDepth;
+
+    /** Largest tree width that still leaves the detail pane usable. */
+    const maxTreeWidth =
+      bodyWidth > 0 ? Math.max(MIN_TREE_WIDTH, bodyWidth - MIN_DETAIL_WIDTH) : Number.POSITIVE_INFINITY;
+
+    const clampTreeWidth = useCallback(
+      (width: number): number =>
+        Math.round(Math.min(Math.max(width, MIN_TREE_WIDTH), maxTreeWidth)),
+      [maxTreeWidth],
+    );
+
+    /** 28% of the container by default, or the host's explicit request. */
+    const defaultTreeWidthValue = useCallback((): number => {
+      if (typeof defaultTreeWidth === 'number' && Number.isFinite(defaultTreeWidth)) {
+        return clampTreeWidth(defaultTreeWidth);
+      }
+      if (bodyWidth <= 0) return MIN_TREE_WIDTH;
+      return clampTreeWidth(Math.min(bodyWidth * DEFAULT_TREE_RATIO, MAX_DEFAULT_TREE_WIDTH));
+    }, [defaultTreeWidth, bodyWidth, clampTreeWidth]);
+
+    // Track the body width so the default ratio survives container resizes and
+    // the clamp stays honest after the user takes over.
+    useIsomorphicLayoutEffect(() => {
+      const body = bodyRef.current;
+      if (!body) return;
+      const measure = (): void => {
+        const next = body.getBoundingClientRect().width;
+        setBodyWidth((current) => (Math.abs(current - next) < 1 ? current : next));
+      };
+      measure();
+      if (typeof ResizeObserver === 'undefined') return;
+      const observer = new ResizeObserver(measure);
+      observer.observe(body);
+      return () => observer.disconnect();
+    }, []);
+
+    useIsomorphicLayoutEffect(() => {
+      if (bodyWidth <= 0) return;
+      setTreeWidth((current) => {
+        const target = userSizedRef.current && current !== null ? current : defaultTreeWidthValue();
+        const clamped = clampTreeWidth(target);
+        return current === clamped ? current : clamped;
+      });
+    }, [bodyWidth, clampTreeWidth, defaultTreeWidthValue]);
+
+    /** Apply a new width, telling the host about it. */
+    const applyTreeWidth = useCallback(
+      (width: number, report = true): void => {
+        const clamped = clampTreeWidth(width);
+        userSizedRef.current = true;
+        setTreeWidth(clamped);
+        if (report) onTreeWidthChange?.(clamped);
+      },
+      [clampTreeWidth, onTreeWidthChange],
+    );
 
     const confirmController = useConfirm();
 
@@ -744,7 +841,89 @@ export const SkillEditor = forwardRef<SkillEditorHandle, SkillEditorProps>(
       acceptDroppedFile(event.dataTransfer.files?.[0]);
     };
 
-    const rootClassName = ['se-root', isDragging ? 'se-root--dragging' : '', className]
+    /* ------------------------------ splitter ------------------------------ */
+
+    const handleSplitterPointerDown = (event: ReactPointerEvent<HTMLDivElement>): void => {
+      if (event.button !== 0) return;
+      event.preventDefault();
+      const startWidth =
+        treeWidth ?? treePanelRef.current?.getBoundingClientRect().width ?? MIN_TREE_WIDTH;
+      dragStateRef.current = { startX: event.clientX, startWidth };
+      lastWidthRef.current = Math.round(startWidth);
+      userSizedRef.current = true;
+      setResizing(true);
+      // Capture keeps the drag alive outside the handle; synthetic events or
+      // older engines may not support it, which is fine.
+      try {
+        event.currentTarget.setPointerCapture?.(event.pointerId);
+      } catch {
+        // Ignore: the drag still works while the pointer stays over the handle.
+      }
+    };
+
+    const handleSplitterPointerMove = (event: ReactPointerEvent<HTMLDivElement>): void => {
+      const drag = dragStateRef.current;
+      if (!drag) return;
+      const next = clampTreeWidth(drag.startWidth + (event.clientX - drag.startX));
+      lastWidthRef.current = next;
+      setTreeWidth(next);
+    };
+
+    const endSplitterDrag = (event: ReactPointerEvent<HTMLDivElement>): void => {
+      if (!dragStateRef.current) return;
+      dragStateRef.current = null;
+      setResizing(false);
+      try {
+        event.currentTarget.releasePointerCapture?.(event.pointerId);
+      } catch {
+        // Ignore: nothing was captured.
+      }
+      const finalWidth = lastWidthRef.current;
+      if (finalWidth !== null) onTreeWidthChange?.(finalWidth);
+    };
+
+    const handleSplitterKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
+      const current =
+        treeWidth ?? treePanelRef.current?.getBoundingClientRect().width ?? MIN_TREE_WIDTH;
+      let next: number;
+      switch (event.key) {
+        case 'ArrowLeft':
+          next = current - TREE_WIDTH_STEP;
+          break;
+        case 'ArrowRight':
+          next = current + TREE_WIDTH_STEP;
+          break;
+        case 'Home':
+          next = MIN_TREE_WIDTH;
+          break;
+        case 'End':
+          next = Number.POSITIVE_INFINITY;
+          break;
+        case 'Enter':
+          next = defaultTreeWidthValue();
+          break;
+        default:
+          return;
+      }
+      event.preventDefault();
+      applyTreeWidth(next);
+    };
+
+    /** Double click restores the default ratio. */
+    const resetTreeWidth = (): void => {
+      userSizedRef.current = false;
+      const next = defaultTreeWidthValue();
+      lastWidthRef.current = next;
+      setTreeWidth(next);
+      onTreeWidthChange?.(next);
+    };
+
+    const rootClassName = [
+      'se-root',
+      isDragging ? 'se-root--dragging' : '',
+      resizing ? 'se-root--resizing' : '',
+      className,
+    ]
       .filter(Boolean)
       .join(' ');
     const renderRow = ({ row, depth, expanded }: FileTreeRowContext): ReactNode => {
@@ -899,8 +1078,16 @@ export const SkillEditor = forwardRef<SkillEditorHandle, SkillEditorProps>(
         onDrop={handleDrop}
         onKeyDown={handleRootKeyDown}
       >
-        <div className="se-body">
-          <section className="se-panel se-panel--tree" aria-label="目录结构">
+        <div
+          className="se-body"
+          ref={bodyRef}
+          style={
+            {
+              '--se-tree-column': treeWidth !== null ? `${treeWidth}px` : undefined,
+            } as CSSProperties
+          }
+        >
+          <section className="se-panel se-panel--tree" aria-label="目录结构" ref={treePanelRef}>
             <div className="se-panel__header">
               <span className="se-panel__title">目录结构</span>
               <div className="se-panel__header-actions">
@@ -943,6 +1130,25 @@ export const SkillEditor = forwardRef<SkillEditorHandle, SkillEditorProps>(
               )}
             </div>
           </section>
+
+          <div
+            className={`se-splitter${resizing ? ' is-active' : ''}`}
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="调整目录树宽度"
+            aria-valuenow={Math.round(treeWidth ?? 0) || undefined}
+            aria-valuemin={MIN_TREE_WIDTH}
+            aria-valuemax={Number.isFinite(maxTreeWidth) ? maxTreeWidth : undefined}
+            tabIndex={0}
+            ref={splitterRef}
+            onPointerDown={handleSplitterPointerDown}
+            onPointerMove={handleSplitterPointerMove}
+            onPointerUp={endSplitterDrag}
+            onPointerCancel={endSplitterDrag}
+            onKeyDown={handleSplitterKeyDown}
+            onDoubleClick={resetTreeWidth}
+            title="拖动调整目录树宽度，双击恢复默认"
+          />
 
           <section className="se-panel se-panel--detail" aria-label="文件详情">
             {detailPane}

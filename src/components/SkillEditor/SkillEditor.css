@@ -22,13 +22,16 @@
   --se-file: #8b96a5;
   --se-warn: #c47d16;
   --se-warn-soft: #fff3e0;
-  --se-tree-width: 320px;
+  --se-tree-width: clamp(200px, 28%, 400px);
+  --se-splitter-size: 8px;
   --se-radius: 12px;
   --se-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
 
   position: relative;
   display: flex;
   flex-direction: column;
+  /* Enables the @container rules below (stacked layout on narrow widths). */
+  container-type: inline-size;
   overflow: hidden;
   box-sizing: border-box;
   block-size: 100%;
@@ -121,9 +124,84 @@
 
 .se-body {
   display: grid;
-  grid-template-columns: var(--se-tree-width) minmax(0, 1fr);
+  /* `--se-tree-column` is set inline while dragging; the CSS var is the default. */
+  grid-template-columns:
+    var(--se-tree-column, var(--se-tree-width)) var(--se-splitter-size)
+    minmax(0, 1fr);
   flex: 1;
   min-block-size: 0;
+}
+
+/* Drag handle between the panes. The visual seam is 1px, the hit area is wider. */
+.se-splitter {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: var(--se-splitter-size);
+  background: var(--se-surface);
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.se-splitter::before {
+  content: '';
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 50%;
+  inline-size: 1px;
+  transform: translateX(-50%);
+  background: var(--se-border-strong);
+  transition:
+    inline-size 120ms ease,
+    background-color 120ms ease;
+}
+
+.se-splitter:hover::before,
+.se-splitter:focus-visible::before,
+.se-splitter.is-active::before {
+  inline-size: 2px;
+  background: var(--se-accent);
+}
+
+/* Three dots advertise the drag affordance without shouting. */
+.se-splitter::after {
+  content: '';
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline-start: 50%;
+  inline-size: 4px;
+  block-size: 26px;
+  transform: translate(-50%, -50%);
+  border-radius: 2px;
+  background:
+    radial-gradient(circle at 50% 18%, var(--se-text-faint) 1.4px, transparent 1.5px),
+    radial-gradient(circle at 50% 50%, var(--se-text-faint) 1.4px, transparent 1.5px),
+    radial-gradient(circle at 50% 82%, var(--se-text-faint) 1.4px, transparent 1.5px);
+  transition: background 120ms ease;
+}
+
+.se-splitter:hover::after,
+.se-splitter:focus-visible::after,
+.se-splitter.is-active::after {
+  background:
+    radial-gradient(circle at 50% 18%, var(--se-accent) 1.4px, transparent 1.5px),
+    radial-gradient(circle at 50% 50%, var(--se-accent) 1.4px, transparent 1.5px),
+    radial-gradient(circle at 50% 82%, var(--se-accent) 1.4px, transparent 1.5px);
+}
+
+.se-splitter:focus-visible {
+  outline: 2px solid var(--se-accent);
+  outline-offset: -2px;
+  border-radius: 2px;
+}
+
+/* Keep the resize cursor while dragging, whatever the pointer is over. */
+.se-root--resizing,
+.se-root--resizing * {
+  cursor: col-resize !important;
+  user-select: none;
 }
 
 .se-panel {
@@ -135,7 +213,6 @@
 
 .se-panel--tree {
   background: var(--se-surface-2);
-  border-inline-end: 1px solid var(--se-border);
 }
 
 .se-panel--detail {
@@ -412,8 +489,12 @@
     grid-template-rows: minmax(180px, 1fr) minmax(120px, 1fr);
   }
 
+  /* Stacked layout: the splitter has nothing to resize. */
+  .se-splitter {
+    display: none;
+  }
+
   .se-panel--tree {
-    border-inline-end: none;
     border-block-end: 1px solid var(--se-border);
   }
 }

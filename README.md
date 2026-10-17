@@ -2,8 +2,8 @@
 
 [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![react](https://img.shields.io/badge/react-18%20%7C%2019-61dafb.svg)](package.json)
-[![bundle](https://img.shields.io/badge/bundle-27%20kB%20gzip-informational.svg)](https://github.com/hp-future/skill-editor)
-[![tests](https://img.shields.io/badge/tests-161%20passing-brightgreen.svg)](#本地开发)
+[![bundle](https://img.shields.io/badge/bundle-28%20kB%20gzip-informational.svg)](https://github.com/hp-future/skill-editor)
+[![tests](https://img.shields.io/badge/tests-168%20passing-brightgreen.svg)](#本地开发)
 
 一个零运行时依赖的 React 组件：接收 `.zip` 技能包，左侧展示解压后的目录树，右侧预览文件内容，可选地编辑文本文件并把改动重新打包成新的 `.zip`。
 
@@ -14,6 +14,7 @@
 ## 特性
 
 - **目录树**：解析 ZIP 中央目录后一次性建树，支持键鼠导航、单目录展开/收起、一键全展开（`Ctrl/⌘ + E`）与全收起（`Ctrl/⌘ + Shift + E`）以及 ARIA 树语义。
+- **可拖拽分栏**：左右宽度默认取容器的 28%（约束在 200–400px），拖动分隔条、方向键或双击即可调整，窄容器自动改为上下堆叠。
 - **文件预览**：Markdown 渲染、文本源码、图片内联，均带路径 / 体积 / 类型 / 行数信息，可复制内容、下载单个文件。
 - **Markdown 渲染**：标题锚点、表格、任务列表、围栏代码块语法高亮（约 20 种语言族）、大纲跳转，以及**包内相对链接直达**（`references/x.md`、`./y.md`、`../SKILL.md`、`#锚点`）。
 - **语法高亮**：不只作用于代码块，`.ts` / `.sh` 等约 40 种扩展名的独立文件同样着色，带语言标记与深浅色两套配色。
@@ -89,6 +90,8 @@ export function Page() {
 | `maxSizeBytes` | `number` | `100 MB` | 超过该体积直接拒绝解析 |
 | `defaultExpandedDepth` | `number` | `1` | 初始展开层级 |
 | `hideExpandToggle` | `boolean` | `false` | 隐藏树头部的展开/收起按钮 |
+| `defaultTreeWidth` | `number` | 容器 28% | 目录树初始宽度（px），仍可拖拽调整 |
+| `onTreeWidthChange` | `(width: number) => void` | — | 拖拽结束或键盘调整后回调最终宽度 |
 | `emptyState` | `ReactNode` | — | 未载入压缩包时的占位内容 |
 | `className` / `style` | `string` / `CSSProperties` | — | 作用于根元素 |
 
@@ -203,7 +206,8 @@ const fontPreviewer = {
 | `--se-warn` / `--se-warn-soft` | 元数据丢失等警告 |
 | `--se-folder` / `--se-markdown` / `--se-file` | 树图标配色 |
 | `--se-code-*` | 语法高亮配色（comment / string / number / keyword / builtin / function / type / property / punctuation） |
-| `--se-tree-width` / `--se-radius` / `--se-mono` | 布局与字体 |
+| `--se-tree-width` | 目录树初始宽度（默认 `clamp(200px, 28%, 400px)`） |
+| `--se-splitter-size` / `--se-radius` / `--se-mono` | 分隔条宽度、圆角与等宽字体 |
 
 ## 键盘快捷键
 
@@ -213,6 +217,9 @@ const fontPreviewer = {
 | 目录树 | `→` / `←` | 展开或进入子目录 / 收起或回到父级 |
 | 目录树 | `Home` / `End` | 跳到首行 / 末行 |
 | 目录树 | `Enter` / `Space` | 选中当前行 |
+| 分隔条 | `←` / `→` | 左右调整，每次 24px |
+| 分隔条 | `Home` / `End` | 滚到最窄 / 最宽 |
+| 分隔条 | `Enter` 或双击 | 恢复默认宽度 |
 | 全局 | `Ctrl/⌘ + E` | 展开全部目录 |
 | 全局 | `Ctrl/⌘ + Shift + E` | 收起全部目录 |
 | 编辑器 | `Ctrl/⌘ + S` | 保存当前文件 |
@@ -226,7 +233,7 @@ const fontPreviewer = {
 - **单条目上限**：ZIP64 的目录结构支持，但单个条目超过 4 GiB 会被拒绝。
 - **预览上限**：文本 2 MB（超出截断并提示）、图片与自定义预览载荷各 20 MB。
 - **格式支持**：仅 Markdown / 文本可编辑；其余格式只读（可通过 `previewers` 增强预览）。
-- **布局**：左右两栏固定比例，未提供拖拽分栏。
+- **布局**：分栏宽度不持久化，换页或重新挂载后回到默认比例（宿主可自行记住 `onTreeWidthChange` 的值）。
 
 ## 浏览器支持
 
