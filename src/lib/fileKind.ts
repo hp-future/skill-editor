@@ -27,6 +27,13 @@ const IMAGE_MIME_TYPES = new Map<string, string>([
   ['svg', 'image/svg+xml'],
   ['avif', 'image/avif'],
 ]);
+const FONT_MIME_TYPES = new Map<string, string>([
+  ['ttf', 'font/ttf'],
+  ['otf', 'font/otf'],
+  ['woff', 'font/woff'],
+  ['woff2', 'font/woff2'],
+  ['eot', 'application/vnd.ms-fontobject'],
+]);
 const TEXT_EXTENSIONS = new Set([
   'csv',
   'env',
@@ -150,6 +157,8 @@ export function mimeForPath(path: string): string {
   const extension = extensionOf(path);
   const image = IMAGE_MIME_TYPES.get(extension);
   if (image) return image;
+  const font = FONT_MIME_TYPES.get(extension);
+  if (font) return font;
   switch (extension) {
     case 'md':
     case 'markdown':

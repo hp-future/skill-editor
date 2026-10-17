@@ -25,6 +25,12 @@ export type {
   FileEditorState,
   UseFileEditorOptions,
 } from './components/SkillEditor';
+export { byExtension, findPreviewer, describePreviewFile } from './components/SkillEditor';
+export type {
+  CustomPreviewProps,
+  FilePreviewer,
+  PreviewFileInfo,
+} from './components/SkillEditor';
 
 export { SkillDocument } from './lib/document/skillDocument';
 export type {

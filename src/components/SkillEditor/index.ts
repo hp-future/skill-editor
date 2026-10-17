@@ -22,3 +22,5 @@ export type {
 } from './useConfirm';
 export { useFilePreview, describePreviewState } from './useFilePreview';
 export type { PreviewMode, PreviewState, UseFilePreviewOptions } from './useFilePreview';
+export { byExtension, findPreviewer, describePreviewFile } from './filePreviewer';
+export type { CustomPreviewProps, FilePreviewer, PreviewFileInfo } from './filePreviewer';

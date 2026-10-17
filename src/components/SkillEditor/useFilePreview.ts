@@ -30,6 +30,15 @@ export type PreviewState =
       readonly fileKind: FileKind;
       readonly objectUrl: string;
     }
+  | {
+      /** A custom previewer claimed the file, so the raw bytes are available. */
+      readonly kind: 'custom';
+      readonly node: SkillFileNode;
+      readonly fileKind: FileKind;
+      readonly bytes: Uint8Array;
+      readonly blob: Blob;
+      readonly objectUrl: string;
+    }
   | { readonly kind: 'binary' | 'unsupported'; readonly node: SkillFileNode; readonly fileKind: FileKind }
   | { readonly kind: 'error'; readonly node: SkillFileNode; readonly fileKind: FileKind; readonly message: string };
 
@@ -42,6 +51,13 @@ export interface UseFilePreviewOptions {
   readonly selectedPath: string | null;
   /** Text size limit before the preview is truncated. */
   readonly textLimit?: number;
+  /**
+   * Returns `true` when a custom previewer owns this file. Its bytes are then
+   * read (up to `customLimit`) even for files the built-in previews skip.
+   */
+  readonly isCustomPreview?: (node: SkillFileNode) => boolean;
+  /** Size limit for files read on behalf of a custom previewer. */
+  readonly customLimit?: number;
 }
 
 /**
@@ -57,6 +73,8 @@ export function useFilePreview({
   tree,
   selectedPath,
   textLimit = TEXT_PREVIEW_LIMIT,
+  isCustomPreview,
+  customLimit = IMAGE_PREVIEW_LIMIT,
 }: UseFilePreviewOptions): PreviewState {
   const [state, setState] = useState<PreviewState>({ kind: 'empty' });
   const objectUrlRef = useRef<string | null>(null);
@@ -90,6 +108,22 @@ export function useFilePreview({
 
     void (async () => {
       try {
+        // A custom previewer wins over the built-in handling, so its bytes are
+        // read even for files the built-in preview would never touch.
+        if (isCustomPreview?.(node)) {
+          if (entry.size > customLimit) {
+            if (fresh()) setState({ kind: 'unsupported', node, fileKind });
+            return;
+          }
+          const bytes = await archive.readEntry(entry);
+          if (!fresh()) return;
+          const blob = new Blob([bytes.slice() as BlobPart], { type: mimeForPath(node.path) });
+          const url = URL.createObjectURL(blob);
+          objectUrlRef.current = url;
+          setState({ kind: 'custom', node, fileKind, bytes, blob, objectUrl: url });
+          return;
+        }
+
         if (fileKind === 'image') {
           if (entry.size > IMAGE_PREVIEW_LIMIT) {
             if (fresh()) setState({ kind: 'unsupported', node, fileKind });
@@ -137,7 +171,7 @@ export function useFilePreview({
       // A newer selection or an unmount invalidates this load.
       loadIdRef.current += 1;
     };
-  }, [archive, tree, selectedPath, textLimit, releaseObjectUrl]);
+  }, [archive, tree, selectedPath, textLimit, isCustomPreview, customLimit, releaseObjectUrl]);
 
   // Revoke the last object URL when the editor goes away.
   useEffect(() => releaseObjectUrl, [releaseObjectUrl]);

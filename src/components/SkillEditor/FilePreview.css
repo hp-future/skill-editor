@@ -226,6 +226,13 @@
   overflow: auto;
 }
 
+/* Wrapper for host-supplied preview bodies; the body owns its own layout. */
+.se-preview__custom {
+  flex: 1;
+  min-block-size: 0;
+  overflow: auto;
+}
+
 .se-preview__notice {
   display: flex;
   align-items: center;

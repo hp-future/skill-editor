@@ -84,6 +84,11 @@ export interface FilePreviewProps {
   readonly language?: string | null;
   /** Replaces the built-in body entirely. */
   readonly renderBody?: (props: FilePreviewProps) => React.ReactNode;
+  /**
+   * Replaces the body once the payload is ready, keeping the loading/error
+   * states. This is how matched custom previewers render.
+   */
+  readonly readyBody?: React.ReactNode;
 }
 
 /** How long a table-of-contents jump stays highlighted. */
@@ -180,6 +185,7 @@ export function FilePreview(props: FilePreviewProps) {
     onNavigate,
     language,
     renderBody,
+    readyBody,
   } = props;
 
   const fileName = name ?? path.slice(path.lastIndexOf('/') + 1);
@@ -527,7 +533,11 @@ export function FilePreview(props: FilePreviewProps) {
             </div>
           )}
 
-          {status === 'ready' && kind === 'image' && objectUrl !== undefined && !imageFailed && (
+          {status === 'ready' && readyBody && (
+            <div className="se-preview__custom">{readyBody}</div>
+          )}
+
+          {status === 'ready' && !readyBody && kind === 'image' && objectUrl !== undefined && !imageFailed && (
             <figure className="se-preview__figure">
               <img
                 className="se-preview__image"
@@ -545,6 +555,7 @@ export function FilePreview(props: FilePreviewProps) {
           )}
 
           {status === 'ready' &&
+            !readyBody &&
             (kind === 'binary' || (kind === 'image' && (imageFailed || objectUrl === undefined))) && (
               <div className="se-preview__placeholder">
                 <FileQuestionIcon className="se-icon" />
@@ -556,7 +567,7 @@ export function FilePreview(props: FilePreviewProps) {
               </div>
             )}
 
-          {status === 'ready' && kind !== 'image' && kind !== 'binary' && (
+          {status === 'ready' && !readyBody && kind !== 'image' && kind !== 'binary' && (
             // Keying by view guarantees a fresh scroll container per view, so
             // switching between rendered Markdown and source starts at the top.
             <div

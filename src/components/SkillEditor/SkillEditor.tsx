@@ -25,6 +25,11 @@ import { FileTree } from './FileTree';
 import type { FileTreeRowContext } from './FileTree';
 import { FilePreview } from './FilePreview';
 import type { FilePreviewProps, PreviewView } from './FilePreview';
+import {
+  describePreviewFile,
+  findPreviewer,
+  type FilePreviewer,
+} from './filePreviewer';
 import { FileEditor } from './FileEditor';
 import { renderMarkdown } from '../../lib/markdown.tsx';
 import { useConfirm } from './useConfirm';
@@ -108,6 +113,15 @@ export interface SkillEditorProps {
   /** Replaces the built-in preview body, keeping its header and actions. */
   renderFilePreview?: (state: PreviewState, props: FilePreviewProps) => ReactNode;
   /**
+   * Custom previews for specific file types, e.g. fonts, PDFs or a JSON viewer.
+   *
+   * The first previewer whose `match` returns `true` wins, its bytes are read
+   * (up to `maxSizeBytes`-independent 20 MB) and `render` is called with the raw
+   * payload once it is available. A matched previewer takes precedence over
+   * `renderFilePreview`.
+   */
+  previewers?: readonly FilePreviewer[];
+  /**
    * Allow editing text files. When `false` (the default) the pane is read-only
    * and no edit affordance is rendered.
    */
@@ -182,6 +196,9 @@ function toPreviewProps(
       return { ...base, status: 'ready', text: state.text, notice: state.notice };
     case 'image':
       return { ...base, status: 'ready', objectUrl: state.objectUrl };
+    case 'custom':
+      // The custom previewer renders through the `readyBody` prop.
+      return { ...base, status: 'ready' };
     case 'unsupported':
       return {
         ...base,
@@ -210,6 +227,7 @@ export const SkillEditor = forwardRef<SkillEditorHandle, SkillEditorProps>(
       children,
       previewMode = 'preview',
       renderFilePreview,
+      previewers,
       editable = false,
       onLoad,
       onError,
@@ -462,12 +480,6 @@ export const SkillEditor = forwardRef<SkillEditorHandle, SkillEditorProps>(
       tree.folderCount > 0 &&
       tree.all.every((node) => node.kind !== 'folder' || expandedPaths.has(node.path));
 
-    const previewState = useFilePreview({
-      archive: result?.archive ?? null,
-      tree,
-      selectedPath,
-    });
-
     /** Kinds of the files that may be edited, keyed by tree path. */
     const editableKinds = useMemo(() => {
       const kinds = new Map<string, FileKind>();
@@ -490,6 +502,34 @@ export const SkillEditor = forwardRef<SkillEditorHandle, SkillEditorProps>(
       const node = tree.byPath.get(selectedPath);
       return node && node.kind === 'file' ? node : null;
     }, [tree, selectedPath]);
+
+    /** Description of the selected file, as handed to custom previewers. */
+    const selectedFileInfo = useMemo(
+      () => (selectedNode ? describePreviewFile(selectedNode.path, selectedNode.size) : null),
+      [selectedNode],
+    );
+
+    /** Host previewer registered for the selected file, if any. */
+    const activePreviewer = useMemo(
+      () => (selectedFileInfo ? findPreviewer(previewers, selectedFileInfo) : undefined),
+      [previewers, selectedFileInfo],
+    );
+
+    /**
+     * Tells the preview machine to read the payload even for files the built-in
+     * previews skip (fonts, PDFs, archives …), because a previewer needs bytes.
+     */
+    const isCustomPreview = useCallback(
+      (node: SkillFileNode) => activePreviewer?.match(describePreviewFile(node.path, node.size)) ?? false,
+      [activePreviewer],
+    );
+
+    const previewState = useFilePreview({
+      archive: result?.archive ?? null,
+      tree,
+      selectedPath,
+      isCustomPreview,
+    });
 
     /** `true` when the selected file can be edited at all. */
     const canEditCurrent = selectedNode !== null && editableKinds.has(selectedNode.path);
@@ -773,6 +813,20 @@ export const SkillEditor = forwardRef<SkillEditorHandle, SkillEditorProps>(
             onNavigate: (target) => navigateToPath?.(target) ?? false,
           };
 
+    /**
+     * Body supplied by the matched custom previewer. Built only once the
+     * payload is ready, so the pane still shows its loading state meanwhile.
+     */
+    const customReadyBody: ReactNode =
+      resolvedPreviewState.kind === 'custom' && activePreviewer
+        ? activePreviewer.render({
+            info: describePreviewFile(resolvedPreviewState.node.path, resolvedPreviewState.node.size),
+            bytes: resolvedPreviewState.bytes,
+            blob: resolvedPreviewState.blob,
+            objectUrl: resolvedPreviewState.objectUrl,
+          })
+        : null;
+
     const showEditor = editorNode !== null;
     const selectedIsDirty = selectedNode !== null && (document?.isDirty(selectedNode.path) ?? false);
     const editProps: FilePreviewProps | null = previewProps
@@ -820,8 +874,12 @@ export const SkillEditor = forwardRef<SkillEditorHandle, SkillEditorProps>(
       ) : editProps ? (
         <FilePreview
           {...editProps}
+          readyBody={customReadyBody ?? undefined}
           renderBody={
-            renderFilePreview ? (props) => renderFilePreview(resolvedPreviewState, props) : undefined
+            // A matched previewer is more specific than the catch-all override.
+            customReadyBody || !renderFilePreview
+              ? undefined
+              : (props) => renderFilePreview(resolvedPreviewState, props)
           }
         />
       ) : (

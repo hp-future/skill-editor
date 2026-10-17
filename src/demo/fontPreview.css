@@ -1,0 +1,77 @@
+.demo-font {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px 18px 24px;
+  overflow: auto;
+}
+
+.demo-font__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.demo-font__badge {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--se-accent-soft, #eaf0ff);
+  color: var(--se-accent, #2f5fd0);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.demo-font__meta {
+  color: var(--se-text-muted, #6b7480);
+  font-size: 12px;
+}
+
+.demo-font__hint {
+  margin: 0;
+  color: var(--se-text-muted, #6b7480);
+  font-size: 12.5px;
+}
+
+.demo-font__hint--error {
+  color: var(--se-danger, #d13b3b);
+}
+
+.demo-font__specimen {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.demo-font__row {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  padding-block: 6px;
+  border-block-end: 1px dashed var(--se-border-soft, #e6e9ee);
+}
+
+.demo-font__size {
+  flex: none;
+  inline-size: 40px;
+  color: var(--se-text-faint, #8b949e);
+  font-family: var(--se-mono, ui-monospace, monospace);
+  font-size: 10.5px;
+}
+
+.demo-font__sample {
+  color: var(--se-text, #1c2229);
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+.demo-font__fallback {
+  margin-inline-start: 12px;
+  color: var(--se-text-muted, #6b7480);
+}
+
+.demo-font__note {
+  margin: 4px 0 0;
+  color: var(--se-text-faint, #8b949e);
+  font-size: 11.5px;
+}

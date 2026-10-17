@@ -39,6 +39,10 @@
 
 10. 独立脚本文件也按语法着色：`.ts` / `.sh`（以及 `.js` `.py` `.yaml` `.json` `.css` `.sql` `.ps1` `.go` 等约 40 种扩展名）在预览里带语言标记与配色，不再只有 Markdown 围栏代码块享受高亮。
 
+**第十阶段（已完成）**
+
+11. 自定义文件预览组件：宿主通过 `previewers` 注册按扩展名 / 自定义条件匹配的预览器，组件负责读出字节并交出 `Blob`，预览内容完全由宿主决定。演示用 `.ttf` 字体做了验证。
+
 ![SkillEditor 目录树](docs/phase1.png)
 
 ## 文件编辑与导出
@@ -158,6 +162,38 @@ const ref = useRef<SkillEditorHandle>(null);
 ![.sh 文件高亮](docs/phase9-sh.png)
 
 ![.ts 文件高亮](docs/phase9-ts.png)
+
+### 自定义文件预览组件（第十阶段）
+
+内置预览只处理 Markdown / 文本 / 图片，其余一律「二进制内容，暂不支持预览」。通过 `previewers` 属性，宿主可以为任意格式提供自己的预览组件——字体、PDF、Office、JSON 树都可以。
+
+```tsx
+import { SkillEditor, byExtension } from 'skill-editor';
+
+const fontPreviewer = {
+  id: 'font',
+  match: byExtension('ttf', 'otf', 'woff', 'woff2'),
+  render: ({ info, bytes, blob, objectUrl }) => (
+    <FontSpecimen name={info.name} size={info.size} url={objectUrl} />
+  ),
+};
+
+<SkillEditor source={file} previewers={[fontPreviewer]} />;
+```
+
+| 项目 | 说明 |
+| --- | --- |
+| `match` | 接收 `{ path, name, extension, kind, size }`，返回 `true` 即认领该文件；按注册顺序取第一个命中，抛错的匹配器会被跳过 |
+| `render` | 载荷就绪后调用，参数含 `info` / `bytes`（原始字节）/ `blob`（已按扩展名设置 MIME）/ `objectUrl`（随切换自动回收） |
+| 读取范围 | 认领的文件即使原本属于「二进制」也会读入内存，上限 20 MB；超限仍走「文件过大」提示 |
+| 优先级 | 命中的预览器 > `renderFilePreview` > 内置预览；预览头部（路径、体积、下载）仍由组件提供 |
+| 加载状态 | 预览器只在 `status === 'ready'` 时渲染，读取期间保留组件的 loading 提示，失败时保留错误提示 |
+
+组件不内置任何字体/PDF 逻辑：`byExtension`、`describePreviewFile`、`findPreviewer` 这些只是匹配工具，渲染与失败处理都由宿主决定。演示页新增「载入字体示例」按钮，会在浏览器里用库自带的 ZIP 写入器现造一个含 `fonts/SkillDemo.ttf` 的技能包：
+
+![自定义字体预览](docs/phase10-font.png)
+
+`src/demo/fixtures/SkillDemo.ttf` 由 `scripts/make-demo-font.py` 生成（5×7 方块字形，仅 2.2 KB，自己的作品，不附带任何第三方字体授权），所以演示字体只覆盖 `A B E S 0 1`，其余字符由系统字体回退。
 
 ## 快速开始
 
