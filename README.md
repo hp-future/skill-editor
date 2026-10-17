@@ -258,6 +258,8 @@ pnpm typecheck  # tsc --noEmit
 pnpm build      # 产出 dist/ 组件包 + dist-types/ 类型声明
 ```
 
+不强制使用 pnpm：`npm install` 后用 `npm run dev` / `npm test` / `npm run build` 等价，yarn 同理。仓库以 `pnpm-lock.yaml` 为准，提交时请勿附带 `package-lock.json` 或 `yarn.lock`。
+
 演示页（`src/demo`）自带宿主工具栏：选择 `.zip`、载入示例包、载入字体示例、导出、清除。
 
 ```
@@ -283,7 +285,7 @@ src/
 3. 提交信息遵循 Conventional Commits（如 `feat: 支持 ...`、`fix: 修正 ...`）；
 4. PR 描述里说明动机、行为变化与验证方式。
 
-代码风格由 Prettier 约束（`pnpm dlx prettier --write .`），不引入新的运行时依赖。
+代码风格由 Prettier 约束（`npx prettier --write .`，pnpm 下等价于 `pnpm dlx prettier --write .`），不引入新的运行时依赖。
 
 ## 许可证
 
