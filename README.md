@@ -273,7 +273,11 @@ pnpm build:demo    # 产出 dist-demo/，base 默认为 /skill-editor/
 pnpm preview:demo  # 本地预览构建产物 http://localhost:4173/skill-editor/
 ```
 
-`.github/workflows/deploy-demo.yml` 会在每次推送到 `main`（或手动触发）时构建并部署到 GitHub Pages，首次运行会自动开启 Pages。仓库改名、改用自定义域名或换静态托管时，用 `pnpm build:demo --base=/` 覆盖 `base` 即可。
+`.github/workflows/deploy-demo.yml` 会在每次推送到 `main`（或手动触发）时构建并部署到 GitHub Pages。
+
+首次使用需要手动开一次 Pages：仓库 **Settings → Pages → Build and deployment → Source** 选 **GitHub Actions**。这一步不能用 `GITHUB_TOKEN` 代劳——创建 Pages 站点需要仓库 admin 权限，Actions 的默认 token 没有，`configure-pages` 的 `enablement: true` 会以 `Resource not accessible by integration` 失败。开启后工作流即可正常部署，后续推送不再需要任何人工操作。
+
+仓库改名、改用自定义域名或换静态托管时，用 `pnpm build:demo --base=/` 覆盖 `base` 即可。
 
 演示页（`src/demo`）自带宿主工具栏：选择 `.zip`、载入示例包、载入字体示例、导出、清除。
 
