@@ -18,7 +18,7 @@
 
 - 地址：https://hp-future.github.io/skill-editor/
 - 演示页源码在 [`src/demo`](https://github.com/hp-future/skill-editor/blob/main/src/demo)，推送到 `main` 后由 GitHub Actions 自动构建并发布到 GitHub Pages
-- 演示包默认载入 `api-call-by-knowledge.zip`；工具栏还提供「载入字体示例」用于查看宿主自定义预览组件
+- 打开后自动载入示例包 `api-call-by-knowledge.zip`；演示页注册了字体预览器，载入包含 `.ttf` 的技能包即可看到自定义预览效果
 
 ## 特性
 
@@ -160,7 +160,7 @@ const fontPreviewer = {
 | 优先级 | 命中的预览器 > `renderFilePreview` > 内置预览 |
 | 状态 | 读取期间保留组件的 loading 提示，失败保留错误提示，只有 `ready` 时才渲染预览组件 |
 
-演示页点「载入字体示例」会现场生成一个包含 `fonts/SkillDemo.ttf` 的技能包，可直接验证：
+演示页注册的是 [`src/demo/FontPreview.tsx`](https://github.com/hp-future/skill-editor/blob/main/src/demo/FontPreview.tsx)：载入任意包含 `.ttf` 的技能包，选中字体文件即可看到样张（下图即该组件的输出）：
 
 ![自定义字体预览](https://raw.githubusercontent.com/hp-future/skill-editor/main/docs/phase10-font.png)
 
@@ -286,7 +286,7 @@ pnpm preview:demo  # 本地预览构建产物 http://localhost:4173/skill-editor
 
 仓库改名、改用自定义域名或换静态托管时，用 `pnpm build:demo --base=/` 覆盖 `base` 即可。
 
-演示页（`src/demo`）自带宿主工具栏：选择 `.zip`、载入示例包、载入字体示例、导出、清除。
+演示页（`src/demo`）自带宿主工具栏：选择 `.zip`、导出、清除；打开时自动载入示例包。
 
 ```
 src/

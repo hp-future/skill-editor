@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { SkillEditor, writeZipArchive } from '../index';
+import { SkillEditor } from '../index';
 import type { EditSummary, SkillEditorHandle } from '../components/SkillEditor';
 import type { SkillArchiveResult } from '../lib/loadSkillArchive';
 import type { SkillTreeNode } from '../lib/skillTree';
@@ -7,7 +7,6 @@ import { formatBytes } from '../lib/format';
 import { fontPreviewer } from './FontPreview';
 import { ArchiveIcon, CloseIcon, DownloadIcon, UploadIcon } from './icons';
 import sampleZipUrl from './sample/api-call-by-knowledge.zip?url';
-import fontUrl from './fixtures/SkillDemo.ttf?url';
 import './styles.css';
 
 /** Reject obviously wrong files before handing them to the editor. */
@@ -60,7 +59,6 @@ export function DemoApp() {
   const [result, setResult] = useState<SkillArchiveResult | null>(null);
   const [selected, setSelected] = useState<SkillTreeNode | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
   const [edits, setEdits] = useState<EditSummary>({
     dirty: false,
     count: 0,
@@ -93,7 +91,6 @@ export function DemoApp() {
   };
 
   const loadSample = useCallback(async () => {
-    setLoading(true);
     setError(null);
     try {
       const response = await fetch(sampleZipUrl);
@@ -104,8 +101,6 @@ export function DemoApp() {
       setSelected(null);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : '示例文件加载失败。');
-    } finally {
-      setLoading(false);
     }
   }, []);
 
@@ -114,51 +109,6 @@ export function DemoApp() {
     requestedSample.current = true;
     void loadSample();
   }, [loadSample]);
-
-  /**
-   * Build a package in the browser that contains a `.ttf`, so the demo can show
-   * the host-registered font previewer. The zip is produced with the library's
-   * own writer — no server round-trip.
-   */
-  const loadFontSample = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await fetch(fontUrl);
-      if (!response.ok) throw new Error(`字体文件请求失败（HTTP ${response.status}）。`);
-      const fontBytes = new Uint8Array(await response.arrayBuffer());
-      const encoder = new TextEncoder();
-      const manifest = [
-        '---',
-        'name: font-demo',
-        'description: "自定义文件预览组件演示：字体文件"',
-        '---',
-        '',
-        '# 字体预览演示',
-        '',
-        '本包中的 `fonts/SkillDemo.ttf` 由**宿主注册的自定义预览器**渲染，',
-        '而不是内置的「二进制内容暂不支持预览」提示。',
-        '',
-        '```tsx',
-        "previewers={[{ match: byExtension('ttf', 'otf'), render: FontPreview }]}",
-        '```',
-        '',
-        'SkillEditor 只负责读出字节、生成 Blob URL，并把控制权交给预览组件；',
-        '字体、PDF、Excel 等格式都可以用同样的方式接入。',
-      ].join('\n');
-      const zip = await writeZipArchive([
-        { path: 'font-demo/SKILL.md', data: encoder.encode(manifest) },
-        { path: 'font-demo/fonts/SkillDemo.ttf', data: fontBytes },
-      ]);
-      setFile(new File([zip.slice() as BlobPart], 'font-demo.zip', { type: 'application/zip' }));
-      setResult(null);
-      setSelected(null);
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : '字体示例加载失败。');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
 
   const pickFile = (picked: File | undefined | null): void => {
     if (!picked) return;
@@ -217,19 +167,6 @@ export function DemoApp() {
               event.target.value = '';
             }}
           />
-          <button type="button" className="demo__button demo__button--ghost" onClick={() => void loadSample()} disabled={loading}>
-            {loading ? '加载示例…' : '载入示例包'}
-          </button>
-          <button
-            type="button"
-            className="demo__button demo__button--ghost"
-            data-testid="demo-font-sample"
-            onClick={() => void loadFontSample()}
-            disabled={loading}
-            title="演示宿主自定义的文件预览组件：.ttf 字体"
-          >
-            载入字体示例
-          </button>
           <button
             type="button"
             className={`demo__button${edits.dirty ? '' : ' demo__button--ghost'}`}
