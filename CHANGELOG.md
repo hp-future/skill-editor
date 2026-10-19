@@ -3,6 +3,12 @@
 本文件格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [Unreleased]
+
+### 新增
+
+- 只读模式：新增 `readOnly` 属性，优先级高于 `editable`。开启后不显示编辑入口，`getDocument()` 返回 `null`，`hasUnsavedChanges()` 恒为 `false`，`discardEdits()` 不做任何事；运行中切换到只读会关闭已打开的编辑器并丢弃草稿。
+
 ## [0.1.2] - 2026-10-18
 
 ### 变更

@@ -68,7 +68,7 @@ export function Page() {
 
 `source` 支持 `Blob` 和 `ArrayBuffer`，传新文件会重新解析，传 `null` 显示空状态。
 
-开启 `editable` 后，文本和 Markdown 文件可以编辑：`Ctrl/⌘ + S` 保存，`Esc` 放弃草稿；草稿未保存时切换文件会弹出确认。
+开启 `editable` 后，文本和 Markdown 文件可以编辑：`Ctrl/⌘ + S` 保存，`Esc` 放弃草稿；草稿未保存时切换文件会弹出确认。`readOnly` 可以强制只读，即使同时开启 `editable` 也不可编辑。
 
 ## API
 
@@ -78,6 +78,7 @@ export function Page() {
 | --- | --- | --- | --- |
 | `source` | `Blob \| ArrayBuffer \| null` | — | 要展示的压缩包 |
 | `editable` | `boolean` | `false` | 允许编辑文本和 Markdown 文件 |
+| `readOnly` | `boolean` | `false` | 强制只读，优先级高于 `editable` |
 | `previewers` | `FilePreviewer[]` | — | 自定义预览组件 |
 | `renderFilePreview` | `(state, props) => ReactNode` | — | 替换预览内容，保留头部 |
 | `previewMode` | `'preview' \| 'placeholder'` | `'preview'` | `placeholder` 时右侧留白 |
@@ -100,7 +101,7 @@ export function Page() {
 | --- | --- |
 | `reload()` | 重新解析当前 `source` |
 | `getResult()` | 已解析的压缩包信息 |
-| `getDocument()` | 文档与改动集合 |
+| `getDocument()` | 文档与改动集合，只读时为 `null` |
 | `getSelectedPath()` | 当前选中节点路径 |
 | `setExpanded(path, expanded)` | 展开或收起目录 |
 | `expandAll()` / `collapseAll()` | 展开 / 收起全部目录 |

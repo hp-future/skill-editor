@@ -133,6 +133,11 @@ export interface SkillEditorProps {
    * and no edit affordance is rendered.
    */
   editable?: boolean;
+  /**
+   * Force read-only mode: no edit affordance, no document mutations, even when
+   * `editable` is on. Useful for review screens or permission-gated hosts.
+   */
+  readOnly?: boolean;
   /** Called after a file is parsed successfully. */
   onLoad?: (result: SkillArchiveResult) => void;
   /** Called when a file cannot be read as a ZIP archive. */
@@ -257,6 +262,7 @@ export const SkillEditor = forwardRef<SkillEditorHandle, SkillEditorProps>(
       renderFilePreview,
       previewers,
       editable = false,
+      readOnly = false,
       onLoad,
       onError,
       onSelectChange,
@@ -577,17 +583,20 @@ export const SkillEditor = forwardRef<SkillEditorHandle, SkillEditorProps>(
       tree.folderCount > 0 &&
       tree.all.every((node) => node.kind !== 'folder' || expandedPaths.has(node.path));
 
+    /** Editing requires both the host's opt-in and the absence of read-only. */
+    const editingEnabled = editable && !readOnly;
+
     /** Kinds of the files that may be edited, keyed by tree path. */
     const editableKinds = useMemo(() => {
       const kinds = new Map<string, FileKind>();
-      if (!editable || !tree) return kinds;
+      if (!editingEnabled || !tree) return kinds;
       for (const node of tree.all) {
         if (node.kind !== 'file') continue;
         const kind = detectFileKind(node.path);
         if (kind === 'markdown' || kind === 'text') kinds.set(node.path, kind);
       }
       return kinds;
-    }, [editable, tree]);
+    }, [editingEnabled, tree]);
 
     /**
      * The file the right pane edits: simply the selected file while the editor
@@ -654,13 +663,16 @@ export const SkillEditor = forwardRef<SkillEditorHandle, SkillEditorProps>(
 
     const saveDraft = useCallback(
       (path: string, text: string) => {
+        // Read-only mode must not mutate the document, even if a stale editor
+        // instance tries to save.
+        if (!editingEnabled) return;
         const doc = documentRef.current;
         if (!doc) return;
         doc.write(path, text);
         setDirtyCount(doc.dirtyCount);
         notifyEditChange(doc, true);
       },
-      [notifyEditChange],
+      [editingEnabled, notifyEditChange],
     );
 
     const exitEditor = useCallback(() => {
@@ -668,6 +680,13 @@ export const SkillEditor = forwardRef<SkillEditorHandle, SkillEditorProps>(
       setPreviewView('rendered');
       notifyEditChange(documentRef.current, false);
     }, [notifyEditChange]);
+
+    // Turning read-only on must close an open editor and drop its draft.
+    useEffect(() => {
+      if (editingEnabled) return;
+      editorDraftRef.current = undefined;
+      setEditing(false);
+    }, [editingEnabled]);
 
     const discardAllEdits = useCallback(() => {
       const doc = documentRef.current;
@@ -769,7 +788,8 @@ export const SkillEditor = forwardRef<SkillEditorHandle, SkillEditorProps>(
       (): SkillEditorHandle => ({
         reload: () => parse(latestSource.current),
         getResult: () => result,
-        getDocument: () => documentRef.current,
+        // Read-only hosts cannot reach the mutable document.
+        getDocument: () => (editingEnabled ? documentRef.current : null),
         setExpanded: (path, expanded) =>
           setExpandedPaths((current) => {
             const next = new Set(current);
@@ -780,8 +800,12 @@ export const SkillEditor = forwardRef<SkillEditorHandle, SkillEditorProps>(
         expandAll: () => handleExpandAll(),
         collapseAll: () => handleCollapseAll(),
         getSelectedPath: () => selectedPath,
-        hasUnsavedChanges: () => (documentRef.current?.dirtyCount ?? 0) > 0,
-        discardEdits: discardAllEdits,
+        hasUnsavedChanges: () =>
+          editingEnabled && (documentRef.current?.dirtyCount ?? 0) > 0,
+        discardEdits: () => {
+          if (!editingEnabled) return;
+          discardAllEdits();
+        },
         exportArchive,
       }),
       [
@@ -792,6 +816,7 @@ export const SkillEditor = forwardRef<SkillEditorHandle, SkillEditorProps>(
         handleCollapseAll,
         discardAllEdits,
         exportArchive,
+        editingEnabled,
       ],
     );
 
