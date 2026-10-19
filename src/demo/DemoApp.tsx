@@ -180,7 +180,6 @@ export function DemoApp() {
           ref={editorRef}
           source={file}
           editable
-          readOnly
           previewers={[fontPreviewer]}
           onLoad={(loaded) => {
             setResult(loaded);
