@@ -1,6 +1,6 @@
 {
   "name": "@hp-future/skill-editor",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "description": "React 组件：载入 .zip 技能包并展示其目录树",
   "type": "module",
   "repository": {
