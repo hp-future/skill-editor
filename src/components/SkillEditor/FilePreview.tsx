@@ -114,7 +114,10 @@ async function saveBlob(blob: Blob, fileName: string): Promise<void> {
   const picker = (
     globalThis as typeof globalThis & {
       showSaveFilePicker?: (options: unknown) => Promise<{
-        createWritable: () => Promise<{ write: (data: Blob) => Promise<void>; close: () => Promise<void> }>;
+        createWritable: () => Promise<{
+          write: (data: Blob) => Promise<void>;
+          close: () => Promise<void>;
+        }>;
       }>;
     }
   ).showSaveFilePicker;
@@ -270,14 +273,11 @@ export function FilePreview(props: FilePreviewProps) {
   }, []);
 
   /** Tell the user why a link did not open anything, without leaving the pane. */
-  const notifyLinkProblem = useCallback(
-    (message: string) => {
-      setLinkNotice(message);
-      window.clearTimeout(noticeTimer.current);
-      noticeTimer.current = window.setTimeout(() => setLinkNotice(null), 4000);
-    },
-    [],
-  );
+  const notifyLinkProblem = useCallback((message: string) => {
+    setLinkNotice(message);
+    window.clearTimeout(noticeTimer.current);
+    noticeTimer.current = window.setTimeout(() => setLinkNotice(null), 4000);
+  }, []);
 
   /**
    * Markdown links point inside the package, so a click has to be intercepted:
@@ -292,8 +292,7 @@ export function FilePreview(props: FilePreviewProps) {
     if (!element) return;
     const target =
       element.getAttribute('data-md-link') ??
-      links.find((link) => link.href !== null && link.href === element.getAttribute('href'))
-        ?.target;
+      links.find((link) => link.href !== null && link.href === element.getAttribute('href'))?.target;
     if (target === undefined || target === null) return;
     // External and unsafe links keep their default behaviour.
     if (isExternalHref(target)) return;
@@ -363,10 +362,7 @@ export function FilePreview(props: FilePreviewProps) {
    * A `.ts` or `.sh` file gets the same palette its fenced block would get.
    */
   const sourceLanguage = language !== undefined ? language : languageForPath(path);
-  const sourceTokens = useMemo(
-    () => highlight(sourceText, sourceLanguage),
-    [sourceText, sourceLanguage],
-  );
+  const sourceTokens = useMemo(() => highlight(sourceText, sourceLanguage), [sourceText, sourceLanguage]);
   const hasHighlight = sourceTokens.language !== null && sourceTokens.language !== 'text';
 
   return (
@@ -533,26 +529,28 @@ export function FilePreview(props: FilePreviewProps) {
             </div>
           )}
 
-          {status === 'ready' && readyBody && (
-            <div className="se-preview__custom">{readyBody}</div>
-          )}
+          {status === 'ready' && readyBody && <div className="se-preview__custom">{readyBody}</div>}
 
-          {status === 'ready' && !readyBody && kind === 'image' && objectUrl !== undefined && !imageFailed && (
-            <figure className="se-preview__figure">
-              <img
-                className="se-preview__image"
-                src={objectUrl}
-                alt={fileName}
-                loading="lazy"
-                decoding="async"
-                onError={() => setImageFailed(true)}
-              />
-              <figcaption>
-                <ImageIcon className="se-icon" />
-                <span>{fileName}</span>
-              </figcaption>
-            </figure>
-          )}
+          {status === 'ready' &&
+            !readyBody &&
+            kind === 'image' &&
+            objectUrl !== undefined &&
+            !imageFailed && (
+              <figure className="se-preview__figure">
+                <img
+                  className="se-preview__image"
+                  src={objectUrl}
+                  alt={fileName}
+                  loading="lazy"
+                  decoding="async"
+                  onError={() => setImageFailed(true)}
+                />
+                <figcaption>
+                  <ImageIcon className="se-icon" />
+                  <span>{fileName}</span>
+                </figcaption>
+              </figure>
+            )}
 
           {status === 'ready' &&
             !readyBody &&
@@ -591,9 +589,7 @@ export function FilePreview(props: FilePreviewProps) {
                   }
                   tabIndex={0}
                 >
-                  <code>
-                    {hasHighlight ? renderTokens(sourceTokens.tokens, 'src') : sourceText}
-                  </code>
+                  <code>{hasHighlight ? renderTokens(sourceTokens.tokens, 'src') : sourceText}</code>
                 </pre>
               )}
             </div>

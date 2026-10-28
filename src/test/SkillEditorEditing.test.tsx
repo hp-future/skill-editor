@@ -140,10 +140,12 @@ describe('<SkillEditor /> editing', () => {
     const textarea = await openEditor(tree, 'SKILL.md');
 
     fireEvent.change(textarea, { target: { value: '# 丢弃我\n' } });
+    // Esc is the escape hatch: it discards the draft without a confirmation.
     fireEvent.keyDown(textarea, { key: 'Escape' });
 
     // Back to the preview, and the document is still clean.
     await screen.findByRole('heading', { name: '旧标题' });
+    expect(screen.queryByRole('dialog')).toBeNull();
     expect(ref.current?.hasUnsavedChanges()).toBe(false);
     expect(screen.queryByRole('textbox')).toBeNull();
   });
@@ -320,7 +322,8 @@ describe('<SkillEditor /> editing', () => {
     });
   });
 
-  it('highlights fenced code blocks in the preview', async () => {    const file = createZipFile(
+  it('highlights fenced code blocks in the preview', async () => {
+    const file = createZipFile(
       [
         {
           name: 'demo-skill/SKILL.md',
@@ -494,9 +497,7 @@ describe('<SkillEditor /> editing', () => {
 
     const skill = archive.entries.find((entry) => entry.path === 'demo-skill/SKILL.md');
     expect(decoder.decode(await archive.readEntry(skill!))).toBe('# 导出我\n');
-    const untouched = archive.entries.find(
-      (entry) => entry.path === 'demo-skill/references/api-index.md',
-    );
+    const untouched = archive.entries.find((entry) => entry.path === 'demo-skill/references/api-index.md');
     expect(decoder.decode(await archive.readEntry(untouched!))).toBe(INDEX);
   });
 
@@ -543,10 +544,60 @@ describe('<SkillEditor /> editing', () => {
       expect(edits.at(-1)).toMatchObject({ dirty: false, draftOpen: true });
     });
 
+    // Esc discards the unsaved draft and leaves without a prompt.
     fireEvent.keyDown(textarea, { key: 'Escape' });
     await waitFor(() => {
       expect(edits.at(-1)).toMatchObject({ dirty: false, draftOpen: false });
     });
+  });
+
+  it('prompts to save the draft when exiting with unsaved changes', async () => {
+    const { ref, tree } = await renderEditable();
+    const textarea = await openEditor(tree, 'SKILL.md');
+    fireEvent.change(textarea, { target: { value: '# 退出前保存\n' } });
+
+    fireEvent.click(screen.getByRole('button', { name: '完成并退出编辑' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText(/未保存的修改/)).toBeTruthy();
+
+    // «取消» keeps the editor open with the draft intact.
+    fireEvent.click(within(dialog).getByRole('button', { name: '取消' }));
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).toBeNull();
+    });
+    expect(screen.getByRole('textbox').textContent).toBe('# 退出前保存\n');
+    expect(ref.current?.hasUnsavedChanges()).toBe(false);
+
+    // «放弃修改并退出» leaves without saving.
+    fireEvent.click(screen.getByRole('button', { name: '完成并退出编辑' }));
+    const discardDialog = await screen.findByRole('dialog');
+    fireEvent.click(within(discardDialog).getByRole('button', { name: '放弃修改并退出' }));
+    await screen.findByRole('heading', { name: '旧标题' });
+    expect(ref.current?.hasUnsavedChanges()).toBe(false);
+
+    // «保存并退出» commits the draft and leaves.
+    const editButton = await screen.findByRole('button', { name: '编辑' });
+    fireEvent.click(editButton);
+    const again = (await screen.findByRole('textbox')) as HTMLTextAreaElement;
+    fireEvent.change(again, { target: { value: '# 退出时保存\n' } });
+    fireEvent.click(screen.getByRole('button', { name: '完成并退出编辑' }));
+    const saveDialog = await screen.findByRole('dialog');
+    fireEvent.click(within(saveDialog).getByRole('button', { name: '保存并退出' }));
+
+    await screen.findByRole('heading', { name: '退出时保存' });
+    expect(ref.current?.hasUnsavedChanges()).toBe(true);
+    expect(ref.current?.getDocument()?.getEdit('SKILL.md')?.text).toBe('# 退出时保存\n');
+  });
+
+  it('leaves the editor without a prompt when the draft is unchanged', async () => {
+    const { ref, tree } = await renderEditable();
+    await openEditor(tree, 'SKILL.md');
+
+    fireEvent.click(screen.getByRole('button', { name: '完成并退出编辑' }));
+
+    await screen.findByRole('heading', { name: '旧标题' });
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(ref.current?.hasUnsavedChanges()).toBe(false);
   });
 
   it('writes files through the document handle', async () => {
@@ -572,7 +623,13 @@ describe('<SkillEditor /> editing', () => {
     act(() => ref.current?.getDocument()?.write('SKILL.md', '# 改动\n'));
     expect(ref.current?.hasUnsavedChanges()).toBe(true);
 
-    rerender(<SkillEditor ref={ref} editable source={createZipFile([{ name: 'other/SKILL.md', content: '# 另一个\n' }], 'other.zip')} />);
+    rerender(
+      <SkillEditor
+        ref={ref}
+        editable
+        source={createZipFile([{ name: 'other/SKILL.md', content: '# 另一个\n' }], 'other.zip')}
+      />,
+    );
 
     await waitFor(() => {
       expect(ref.current?.getDocument()?.sourceFileName).toBe('other.zip');
@@ -590,11 +647,11 @@ describe('useConfirm dialog', () => {
 
     const dialog = await screen.findByRole('dialog');
     // Three actions: discard, cancel, save-and-switch.
-    expect(within(dialog).getAllByRole('button').map((button) => button.textContent)).toEqual([
-      '放弃修改并切换',
-      '取消',
-      '保存并切换',
-    ]);
+    expect(
+      within(dialog)
+        .getAllByRole('button')
+        .map((button) => button.textContent),
+    ).toEqual(['放弃修改并切换', '取消', '保存并切换']);
 
     fireEvent.click(within(dialog).getByRole('button', { name: '取消' }));
     await waitFor(() => {

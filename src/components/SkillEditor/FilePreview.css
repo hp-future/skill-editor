@@ -305,16 +305,19 @@
 
 /* ------------------------------- source --------------------------------- */
 
+/* Source view: wrap long lines instead of scrolling sideways, matching the
+   editor textarea so both modes read the same file the same way. */
 .se-preview__source {
   margin: 0;
   padding: 12px 14px;
-  min-inline-size: 100%;
   color: var(--se-text);
   font-family: var(--se-mono);
   font-size: 12px;
   line-height: 1.65;
   tab-size: 2;
-  white-space: pre;
+  overflow-x: hidden;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 /* Language badge for highlighted files, matching fenced blocks in Markdown. */

@@ -184,9 +184,16 @@
   outline: none;
   resize: none;
   tab-size: 2;
-  white-space: pre;
+  overflow-x: hidden;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.se-editor__textarea::-webkit-scrollbar-horizontal {
+  display: none;
+  height: 0;
 }
 
 .se-editor__textarea:focus-visible {
-  box-shadow: inset 0 0 0 2px var(--se-accent);
+  box-shadow: none;
 }
